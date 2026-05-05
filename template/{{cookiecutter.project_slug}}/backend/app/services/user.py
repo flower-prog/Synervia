@@ -14,6 +14,9 @@ from app.core.security import get_password_hash, verify_password
 from app.db.models.user import User
 from app.repositories import user_repo
 from app.schemas.user import UserCreate, UserUpdate
+{%- if cookiecutter.enable_teams %}
+from app.services.organization import OrganizationService
+{%- endif %}
 
 if TYPE_CHECKING:
     from app.schemas.conversation_share import AdminUserList
@@ -109,13 +112,32 @@ class UserService:
             )
 
         hashed_password = get_password_hash(user_in.password)
-        return await user_repo.create(
+        user = await user_repo.create(
             self.db,
             email=user_in.email,
             hashed_password=hashed_password,
             full_name=user_in.full_name,
             role=user_in.role.value,
         )
+{%- if cookiecutter.enable_teams %}
+        org_service = OrganizationService(self.db)
+        await org_service.create_personal_org(user.id, user_in.email)
+{%- endif %}
+{%- if cookiecutter.enable_email %}
+        try:
+            from app.email.service import get_email_service
+            from app.core.config import settings
+            email_svc = get_email_service()
+            login_url = getattr(settings, "BILLING_SUCCESS_URL", None) or getattr(settings, "FRONTEND_URL", "/")
+            await email_svc.send_welcome(
+                to=user.email,
+                name=user.full_name or user.email,
+                login_url=login_url,
+            )
+        except Exception:
+            pass
+{%- endif %}
+        return user
 
     async def authenticate(self, email: str, password: str) -> User:
         """Authenticate user by email and password.
@@ -257,6 +279,9 @@ from app.core.security import get_password_hash, verify_password
 from app.db.models.user import User
 from app.repositories import user_repo
 from app.schemas.user import UserCreate, UserUpdate
+{%- if cookiecutter.enable_teams %}
+from app.services.organization import OrganizationService
+{%- endif %}
 
 if TYPE_CHECKING:
     from app.schemas.conversation_share import AdminUserList
@@ -352,13 +377,18 @@ class UserService:
             )
 
         hashed_password = get_password_hash(user_in.password)
-        return user_repo.create(
+        user = user_repo.create(
             self.db,
             email=user_in.email,
             hashed_password=hashed_password,
             full_name=user_in.full_name,
             role=user_in.role.value,
         )
+{%- if cookiecutter.enable_teams %}
+        org_service = OrganizationService(self.db)
+        org_service.create_personal_org(user.id, user_in.email)
+{%- endif %}
+        return user
 
     def authenticate(self, email: str, password: str) -> User:
         """Authenticate user by email and password.
@@ -470,6 +500,9 @@ from app.core.security import get_password_hash, verify_password
 from app.db.models.user import User
 from app.repositories import user_repo
 from app.schemas.user import UserCreate, UserUpdate
+{%- if cookiecutter.enable_teams %}
+from app.services.organization import OrganizationService
+{%- endif %}
 
 if TYPE_CHECKING:
     from app.schemas.conversation_share import AdminUserList
@@ -555,12 +588,17 @@ class UserService:
             )
 
         hashed_password = get_password_hash(user_in.password)
-        return await user_repo.create(
+        user = await user_repo.create(
             email=user_in.email,
             hashed_password=hashed_password,
             full_name=user_in.full_name,
             role=user_in.role.value,
         )
+{%- if cookiecutter.enable_teams %}
+        org_service = OrganizationService()
+        await org_service.create_personal_org(str(user.id), user_in.email)
+{%- endif %}
+        return user
 
     async def authenticate(self, email: str, password: str) -> User:
         """Authenticate user by email and password.

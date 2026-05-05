@@ -172,6 +172,13 @@ class ConversationCreate(ConversationBase):
     project_id: str | None = Field(default=None, description="Project this conversation belongs to")
 {%- endif %}
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+{%- if cookiecutter.use_postgresql %}
+    organization_id: UUID | None = Field(default=None, description="Organization this conversation belongs to")
+{%- else %}
+    organization_id: str | None = Field(default=None, description="Organization this conversation belongs to")
+{%- endif %}
+{%- endif %}
 
 
 class ConversationUpdate(BaseSchema):
@@ -179,6 +186,23 @@ class ConversationUpdate(BaseSchema):
 
     title: str | None = Field(default=None, max_length=255)
     is_archived: bool | None = None
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+
+
+class ConversationKBSettings(BaseSchema):
+    """Schema for updating KB selection on a conversation.
+
+    null  = use defaults (personal+org KBs on, app KBs off)
+    []    = RAG disabled for this conversation
+    [id1] = explicit KB selection
+    """
+
+    active_knowledge_base_ids: list[str] | None = Field(
+        default=None,
+        description="null=use defaults, []=RAG disabled, [id,...]=explicit KB selection",
+    )
+{%- endif %}
 
 
 class ConversationRead(ConversationBase, TimestampSchema):
@@ -192,6 +216,9 @@ class ConversationRead(ConversationBase, TimestampSchema):
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: UUID | None = None
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: UUID | None = None
+{%- endif %}
 {%- else %}
     id: str
 {%- if cookiecutter.use_jwt %}
@@ -200,8 +227,28 @@ class ConversationRead(ConversationBase, TimestampSchema):
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: str | None = None
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: str | None = None
+{%- endif %}
 {%- endif %}
     is_archived: bool = False
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: list[str] | None = None
+{%- if cookiecutter.use_sqlite %}
+
+    @field_validator("active_knowledge_base_ids", mode="before")
+    @classmethod
+    def deserialize_active_kb_ids(cls, v: object) -> list[str] | None:
+        if isinstance(v, str):
+            import json
+            try:
+                parsed = json.loads(v)
+                return parsed  # type: ignore[return-value]
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return v  # type: ignore[return-value]
+{%- endif %}
+{%- endif %}
 
 
 class ConversationReadWithMessages(ConversationRead):

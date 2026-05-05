@@ -44,6 +44,17 @@ class Conversation(TimestampMixin, SQLModel, table=True):
         ),
     )
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            PG_UUID(as_uuid=True),
+            ForeignKey("organizations.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: uuid.UUID | None = Field(
         default=None,
@@ -57,6 +68,12 @@ class Conversation(TimestampMixin, SQLModel, table=True):
 {%- endif %}
     title: str | None = Field(default=None, max_length=255)
     is_archived: bool = Field(default=False)
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: list[str] | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+    )
+{%- endif %}
 
     # Relationships
     messages: list["Message"] = Relationship(
@@ -205,6 +222,14 @@ class Conversation(Base, TimestampMixin):
         index=True,
     )
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -215,6 +240,9 @@ class Conversation(Base, TimestampMixin):
 {%- endif %}
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+{%- endif %}
 
     # Relationships
     messages: Mapped[list["Message"]] = relationship(
@@ -360,6 +388,17 @@ class Conversation(TimestampMixin, SQLModel, table=True):
         ),
     )
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: str | None = Field(
+        default=None,
+        sa_column=Column(
+            String(36),
+            ForeignKey("organizations.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+    )
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: str | None = Field(
         default=None,
@@ -373,6 +412,12 @@ class Conversation(TimestampMixin, SQLModel, table=True):
 {%- endif %}
     title: str | None = Field(default=None, max_length=255)
     is_archived: bool = Field(default=False)
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: str | None = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+    )
+{%- endif %}
 
     # Relationships
     messages: list["Message"] = Relationship(
@@ -488,6 +533,14 @@ class Conversation(Base, TimestampMixin):
         index=True,
     )
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: Mapped[str | None] = mapped_column(
         String(36),
@@ -498,6 +551,9 @@ class Conversation(Base, TimestampMixin):
 {%- endif %}
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+{%- endif %}
 
     # Relationships
     messages: Mapped[list["Message"]] = relationship(
@@ -629,18 +685,24 @@ class Conversation(Document):
 {%- if cookiecutter.use_jwt %}
     user_id: Optional[str] = None
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: Optional[str] = None
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: Optional[str] = None
 {%- endif %}
     title: Optional[str] = None
     is_archived: bool = False
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    active_knowledge_base_ids: Optional[list[str]] = None
+{%- endif %}
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: Optional[datetime] = None
 
     class Settings:
         name = "conversations"
 {%- if cookiecutter.use_jwt %}
-        indexes = ["user_id"{%- if cookiecutter.use_pydantic_deep %}, "project_id"{%- endif %}]
+        indexes = ["user_id"{%- if cookiecutter.enable_teams %}, "organization_id"{%- endif %}{%- if cookiecutter.use_pydantic_deep %}, "project_id"{%- endif %}]
 {%- endif %}
 
 

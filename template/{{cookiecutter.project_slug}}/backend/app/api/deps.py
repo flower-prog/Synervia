@@ -2,14 +2,17 @@
 
 Dependency injection factories for services, repositories, and authentication.
 """
-{%- if cookiecutter.use_database or cookiecutter.use_jwt or cookiecutter.use_api_key or cookiecutter.enable_redis %}
+{%- if cookiecutter.use_database or cookiecutter.use_jwt or cookiecutter.use_api_key or cookiecutter.enable_redis or cookiecutter.enable_teams %}
 # ruff: noqa: I001, E402 - Imports structured for Jinja2 template conditionals
 {%- endif %}
-{%- if cookiecutter.use_database or cookiecutter.use_jwt or cookiecutter.use_api_key or cookiecutter.enable_redis %}
+{%- if cookiecutter.use_database or cookiecutter.use_jwt or cookiecutter.use_api_key or cookiecutter.enable_redis or cookiecutter.enable_teams %}
 
 from typing import Annotated
 
 from fastapi import Depends
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+from fastapi import Header
 {%- endif %}
 {%- if cookiecutter.use_jwt %}
 from fastapi.security import OAuth2PasswordBearer
@@ -246,6 +249,28 @@ RAGSyncSvc = Annotated[RAGSyncService, Depends(get_rag_sync_service)]
 SyncSourceSvc = Annotated[SyncSourceService, Depends(get_sync_source_service)]
 {%- endif %}
 
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.services.knowledge_base import KnowledgeBaseService
+
+
+def get_knowledge_base_service(db: DBSession) -> KnowledgeBaseService:
+    """Create KnowledgeBaseService instance with database session."""
+    return KnowledgeBaseService(db)
+
+
+KnowledgeBaseSvc = Annotated[KnowledgeBaseService, Depends(get_knowledge_base_service)]
+{%- elif cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt and cookiecutter.use_mongodb %}
+from app.services.knowledge_base import KnowledgeBaseService
+
+
+def get_knowledge_base_service() -> KnowledgeBaseService:
+    """Create KnowledgeBaseService instance."""
+    return KnowledgeBaseService()
+
+
+KnowledgeBaseSvc = Annotated[KnowledgeBaseService, Depends(get_knowledge_base_service)]
+{%- endif %}
+
 {%- if cookiecutter.use_jwt and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 from app.services.file_upload import FileUploadService
 
@@ -256,6 +281,67 @@ def get_file_upload_service(db: DBSession) -> FileUploadService:
 
 
 FileUploadSvc = Annotated[FileUploadService, Depends(get_file_upload_service)]
+{%- endif %}
+
+{%- if cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.services.organization import OrganizationService
+from app.services.member import MemberService
+from app.services.invitation import InvitationService
+
+
+def get_organization_service(db: DBSession) -> OrganizationService:
+    """Create OrganizationService instance with database session."""
+    return OrganizationService(db)
+
+
+def get_member_service(db: DBSession) -> MemberService:
+    """Create MemberService instance with database session."""
+    return MemberService(db)
+
+
+def get_invitation_service(db: DBSession) -> InvitationService:
+    """Create InvitationService instance with database session."""
+    return InvitationService(db)
+
+
+OrganizationSvc = Annotated[OrganizationService, Depends(get_organization_service)]
+MemberSvc = Annotated[MemberService, Depends(get_member_service)]
+InvitationSvc = Annotated[InvitationService, Depends(get_invitation_service)]
+{%- if cookiecutter.enable_billing %}
+from app.services.billing import BillingService
+
+
+def get_billing_service(db: DBSession) -> BillingService:
+    """Create BillingService instance with database session."""
+    return BillingService(db)
+
+
+BillingSvc = Annotated[BillingService, Depends(get_billing_service)]
+{%- endif %}
+{%- elif cookiecutter.enable_teams and cookiecutter.use_mongodb %}
+from app.services.organization import OrganizationService
+from app.services.member import MemberService
+from app.services.invitation import InvitationService
+
+
+def get_organization_service() -> OrganizationService:
+    """Create OrganizationService instance."""
+    return OrganizationService()
+
+
+def get_member_service() -> MemberService:
+    """Create MemberService instance."""
+    return MemberService()
+
+
+def get_invitation_service() -> InvitationService:
+    """Create InvitationService instance."""
+    return InvitationService()
+
+
+OrganizationSvc = Annotated[OrganizationService, Depends(get_organization_service)]
+MemberSvc = Annotated[MemberService, Depends(get_member_service)]
+InvitationSvc = Annotated[InvitationService, Depends(get_invitation_service)]
 {%- endif %}
 
 {%- if cookiecutter.use_jwt %}
@@ -525,6 +611,184 @@ async def get_current_active_superuser(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentSuperuser = Annotated[User, Depends(get_current_active_superuser)]
 CurrentAdmin = Annotated[User, Depends(RoleChecker(UserRole.ADMIN))]
+
+{%- if cookiecutter.enable_teams %}
+{%- if cookiecutter.use_postgresql %}
+from uuid import UUID
+
+from app.core.exceptions import AuthorizationError, NotFoundError
+from app.db.models.organization import Organization, OrgRole
+
+
+async def get_active_organization(
+    user: CurrentUser,
+    db: DBSession,
+    x_organization_id: UUID | None = Header(None),
+) -> Organization:
+    """Resolve the active Organization for the current request.
+
+    Reads ``X-Organization-Id`` header. Falls back to the user's Personal Org
+    when the header is absent. Raises 404 if the user is not a member.
+    """
+    from app.repositories import member_repo, organization_repo
+
+    if x_organization_id is None:
+        org = await organization_repo.get_personal_for_user(db, user.id)
+        if not org:
+            raise NotFoundError(message="Personal organization not found — please re-register")
+        return org
+
+    membership = await member_repo.get(db, organization_id=x_organization_id, user_id=user.id)
+    if not membership:
+        raise NotFoundError(
+            message="Organization not found or access denied",
+            details={"org_id": str(x_organization_id)},
+        )
+    org = await organization_repo.get_by_id(db, x_organization_id)
+    if not org:
+        raise NotFoundError(message="Organization not found", details={"org_id": str(x_organization_id)})
+    return org
+
+
+ActiveOrg = Annotated[Organization, Depends(get_active_organization)]
+{%- elif cookiecutter.use_sqlite %}
+from app.core.exceptions import AuthorizationError, NotFoundError
+from app.db.models.organization import Organization, OrgRole
+
+
+def get_active_organization(
+    user: CurrentUser,
+    db: DBSession,
+    x_organization_id: str | None = Header(None),
+) -> Organization:
+    """Resolve the active Organization for the current request.
+
+    Reads ``X-Organization-Id`` header. Falls back to the user's Personal Org
+    when the header is absent. Raises 404 if the user is not a member.
+    """
+    from app.repositories import member_repo, organization_repo
+
+    if x_organization_id is None:
+        org = organization_repo.get_personal_for_user(db, user.id)
+        if not org:
+            raise NotFoundError(message="Personal organization not found — please re-register")
+        return org
+
+    membership = member_repo.get(db, organization_id=x_organization_id, user_id=user.id)
+    if not membership:
+        raise NotFoundError(
+            message="Organization not found or access denied",
+            details={"org_id": x_organization_id},
+        )
+    org = organization_repo.get_by_id(db, x_organization_id)
+    if not org:
+        raise NotFoundError(message="Organization not found", details={"org_id": x_organization_id})
+    return org
+
+
+ActiveOrg = Annotated[Organization, Depends(get_active_organization)]
+{%- elif cookiecutter.use_mongodb %}
+from app.core.exceptions import AuthorizationError, NotFoundError
+from app.db.models.organization import Organization, OrgRole
+
+
+async def get_active_organization(
+    user: CurrentUser,
+    x_organization_id: str | None = Header(None),
+) -> Organization:
+    """Resolve the active Organization for the current request."""
+    from app.repositories import member_repo, organization_repo
+
+    if x_organization_id is None:
+        org = await organization_repo.get_personal_for_user(str(user.id))
+        if not org:
+            raise NotFoundError(message="Personal organization not found — please re-register")
+        return org
+
+    membership = await member_repo.get(organization_id=x_organization_id, user_id=str(user.id))
+    if not membership:
+        raise NotFoundError(
+            message="Organization not found or access denied",
+            details={"org_id": x_organization_id},
+        )
+    org = await organization_repo.get_by_id(x_organization_id)
+    if not org:
+        raise NotFoundError(message="Organization not found", details={"org_id": x_organization_id})
+    return org
+
+
+ActiveOrg = Annotated[Organization, Depends(get_active_organization)]
+{%- endif %}
+
+
+# === RBAC helpers for org-level role checks ===
+
+class RequireOrgRole:
+    """Dependency that verifies the requester has one of the allowed roles in the active org.
+
+    Usage::
+
+        @router.delete("/{org_id}")
+        async def delete(org: RequireOwner, ...) -> None: ...
+    """
+
+    def __init__(self, *allowed_roles: str) -> None:
+        self.allowed_roles = set(allowed_roles)
+
+{%- if cookiecutter.use_postgresql %}
+
+    async def __call__(self, org: ActiveOrg, user: CurrentUser, db: DBSession) -> Organization:
+        from app.repositories import member_repo as _member_repo
+        membership = await _member_repo.get(db, organization_id=org.id, user_id=user.id)
+        if not membership or membership.role not in self.allowed_roles:
+            raise AuthorizationError(
+                message="Insufficient organization role",
+                details={"required": list(self.allowed_roles), "org_id": str(org.id)},
+            )
+        return org
+
+{%- elif cookiecutter.use_sqlite %}
+
+    def __call__(self, org: ActiveOrg, user: CurrentUser, db: DBSession) -> Organization:
+        from app.repositories import member_repo as _member_repo
+        membership = _member_repo.get(db, organization_id=org.id, user_id=str(user.id))
+        if not membership or membership.role not in self.allowed_roles:
+            raise AuthorizationError(
+                message="Insufficient organization role",
+                details={"required": list(self.allowed_roles), "org_id": str(org.id)},
+            )
+        return org
+
+{%- elif cookiecutter.use_mongodb %}
+
+    async def __call__(self, org: ActiveOrg, user: CurrentUser) -> Organization:
+        from app.repositories import member_repo as _member_repo
+        membership = await _member_repo.get(organization_id=str(org.id), user_id=str(user.id))
+        if not membership or membership.role not in self.allowed_roles:
+            raise AuthorizationError(
+                message="Insufficient organization role",
+                details={"required": list(self.allowed_roles), "org_id": str(org.id)},
+            )
+        return org
+
+{%- endif %}
+
+
+RequireOwner = Annotated[Organization, Depends(RequireOrgRole(OrgRole.OWNER.value))]
+RequireAdminPlus = Annotated[Organization, Depends(RequireOrgRole(OrgRole.OWNER.value, OrgRole.ADMIN.value))]
+RequireMemberPlus = Annotated[Organization, Depends(RequireOrgRole(OrgRole.OWNER.value, OrgRole.ADMIN.value, OrgRole.MEMBER.value))]
+
+
+async def _require_app_admin(user: CurrentUser) -> "User":  # type: ignore[name-defined]
+    """Raises 403 unless the user has the is_app_admin flag set."""
+    if not getattr(user, "is_app_admin", False):
+        raise AuthorizationError(message="App admin privileges required")
+    return user
+
+
+CurrentAppAdmin = Annotated["User", Depends(_require_app_admin)]  # type: ignore[valid-type]
+
+{%- endif %}
 
 
 # WebSocket authentication dependency

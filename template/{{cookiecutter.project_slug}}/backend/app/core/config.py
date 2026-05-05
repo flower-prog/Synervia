@@ -470,6 +470,50 @@ class Settings(BaseSettings):
 
 {%- endif %}
 
+{%- if cookiecutter.enable_billing %}
+
+    # === Stripe Billing ===
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_API_VERSION: str = "2025-04-30.acacia"
+    STRIPE_TRIAL_DAYS_DEFAULT: int = {{ cookiecutter.billing_trial_days_default }}
+    STRIPE_TRIAL_REQUIRES_PAYMENT_METHOD: bool = {{ cookiecutter.billing_trial_requires_card | lower }}
+
+    BILLING_DEFAULT_CURRENCY: str = "{{ cookiecutter.billing_default_currency }}"
+    BILLING_SUCCESS_URL: str = f"{'{FRONTEND_URL}'}/billing?status=success&session_id={{CHECKOUT_SESSION_ID}}"
+    BILLING_CANCEL_URL: str = f"{'{FRONTEND_URL}'}/pricing?status=canceled"
+    BILLING_PORTAL_RETURN_URL: str = f"{'{FRONTEND_URL}'}/billing"
+
+{%- if cookiecutter.enable_credits_system %}
+    CREDITS_PER_USD: int = {{ cookiecutter.billing_credits_per_usd }}
+    CREDITS_LOW_THRESHOLD: int = {{ cookiecutter.billing_credits_low_threshold }}
+    CREDITS_FREE_TIER_GRANT: int = {{ cookiecutter.billing_credits_free_tier_grant }}
+{%- endif %}
+{%- if cookiecutter.enable_slack_alerts %}
+    SLACK_ANOMALY_WEBHOOK_URL: str = ""
+{%- endif %}
+{%- endif %}
+
+{%- if cookiecutter.enable_email %}
+
+    # === Email ===
+    EMAIL_PROVIDER: str = "{{ cookiecutter.email_provider }}"
+    EMAIL_FROM: str = "noreply@{{ cookiecutter.project_slug }}.com"
+    EMAIL_FROM_NAME: str = "{{ cookiecutter.project_name }}"
+    EMAIL_REPLY_TO: str | None = None
+{%- if cookiecutter.email_provider == "resend" %}
+    RESEND_API_KEY: str = ""
+{%- elif cookiecutter.email_provider == "smtp" %}
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = True
+{%- endif %}
+    LOG_PROVIDER_WRITE_TO_DISK: bool = False
+{%- endif %}
+
 {%- if cookiecutter.enable_cors %}
 
     # === CORS ===

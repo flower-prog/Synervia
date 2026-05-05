@@ -7,7 +7,7 @@ from fastapi import APIRouter
 
 from app.api.routes.v1 import health
 {%- if cookiecutter.use_jwt %}
-from app.api.routes.v1 import admin_ratings, auth, users
+from app.api.routes.v1 import admin_ratings, admin_users, auth, users
 {%- endif %}
 {%- if cookiecutter.enable_oauth %}
 from app.api.routes.v1 import oauth
@@ -42,6 +42,16 @@ from app.api.routes.v1 import telegram_webhook
 {%- endif %}
 {%- if cookiecutter.use_slack %}
 from app.api.routes.v1 import slack_webhook
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+from app.api.routes.v1 import members, organizations
+from app.api.routes.v1.invitations import org_router as invitations_org_router, token_router as invitations_token_router
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+from app.api.routes.v1 import knowledge_bases
+{%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams %}
+from app.api.routes.v1 import billing
 {%- endif %}
 
 v1_router = APIRouter()
@@ -111,6 +121,9 @@ v1_router.include_router(files.router, tags=["files"])
 
 # Admin: conversation browser + user listing
 v1_router.include_router(admin_conversations.router, prefix="/admin/conversations", tags=["admin-conversations"])
+
+# Admin: user management + impersonation
+v1_router.include_router(admin_users.router, prefix="/admin/users", tags=["admin:users"])
 {%- endif %}
 
 {%- if cookiecutter.use_telegram or cookiecutter.use_slack %}
@@ -129,4 +142,33 @@ v1_router.include_router(telegram_webhook.router, prefix="/telegram", tags=["tel
 
 # Slack Events API endpoint
 v1_router.include_router(slack_webhook.router, prefix="/slack", tags=["slack"])
+{%- endif %}
+
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+
+# Organization management routes (multi-tenant teams)
+v1_router.include_router(organizations.router, prefix="/orgs", tags=["organizations"])
+
+# Member management routes (/orgs/{org_id}/members/*)
+v1_router.include_router(members.router, prefix="/orgs", tags=["members"])
+
+# Invitation org-scoped routes (/orgs/{org_id}/invitations)
+v1_router.include_router(invitations_org_router, prefix="/orgs", tags=["invitations"])
+
+# Invitation token-based routes (/invitations/{token}/accept and DELETE)
+v1_router.include_router(invitations_token_router, tags=["invitations"])
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+
+# Knowledge Base routes (/kb/*)
+v1_router.include_router(knowledge_bases.router, prefix="/kb", tags=["knowledge-bases"])
+{%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams %}
+
+# Billing routes (Stripe Checkout, Portal, Webhook)
+v1_router.include_router(billing.router, prefix="/billing", tags=["billing"])
+{%- endif %}
+{%- if cookiecutter.enable_newsletter_signup %}
+from app.api.routes.v1 import marketing
+v1_router.include_router(marketing.router, tags=["marketing"])
 {%- endif %}

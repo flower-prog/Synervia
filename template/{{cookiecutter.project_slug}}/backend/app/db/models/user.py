@@ -47,6 +47,9 @@ class User(TimestampMixin, SQLModel, table=True):
     full_name: str | None = Field(default=None, max_length=255)
     is_active: bool = Field(default=True)
     role: str = Field(default=UserRole.USER.value, max_length=50)
+{%- if cookiecutter.enable_teams %}
+    is_app_admin: bool = Field(default=False)
+{%- endif %}
 {%- if cookiecutter.enable_oauth %}
     oauth_provider: str | None = Field(default=None, sa_column=Column(String(50), nullable=True, index=True))
     oauth_id: str | None = Field(default=None, sa_column=Column(String(255), nullable=True, index=True))
@@ -123,6 +126,9 @@ class User(Base, TimestampMixin):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     role: Mapped[str] = mapped_column(String(50), default=UserRole.USER.value, nullable=False)
+{%- if cookiecutter.enable_teams %}
+    is_app_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+{%- endif %}
 {%- if cookiecutter.enable_oauth %}
     oauth_provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     oauth_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
@@ -203,6 +209,9 @@ class User(TimestampMixin, SQLModel, table=True):
     full_name: str | None = Field(default=None, max_length=255)
     is_active: bool = Field(default=True)
     role: str = Field(default=UserRole.USER.value, max_length=50)
+{%- if cookiecutter.enable_teams %}
+    is_app_admin: bool = Field(default=False)
+{%- endif %}
 {%- if cookiecutter.enable_oauth %}
     oauth_provider: str | None = Field(default=None, sa_column=Column(String(50), nullable=True, index=True))
     oauth_id: str | None = Field(default=None, sa_column=Column(String(255), nullable=True, index=True))
@@ -278,6 +287,9 @@ class User(Base, TimestampMixin):
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     role: Mapped[str] = mapped_column(String(50), default=UserRole.USER.value, nullable=False)
+{%- if cookiecutter.enable_teams %}
+    is_app_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+{%- endif %}
 {%- if cookiecutter.enable_oauth %}
     oauth_provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     oauth_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
@@ -341,6 +353,9 @@ class User(Document):
     full_name: Optional[str] = None
     is_active: bool = True
     role: str = UserRole.USER.value
+{%- if cookiecutter.enable_teams %}
+    is_app_admin: bool = False
+{%- endif %}
 {%- if cookiecutter.enable_oauth %}
     oauth_provider: Optional[str] = None
     oauth_id: Optional[str] = None

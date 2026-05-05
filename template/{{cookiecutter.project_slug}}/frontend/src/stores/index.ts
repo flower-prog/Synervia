@@ -7,3 +7,6 @@ export { useConversationStore } from "./conversation-store";
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
 export { useProjectStore } from "./project-store";
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+export { useOrgStore } from "./org-store";
+{%- endif %}

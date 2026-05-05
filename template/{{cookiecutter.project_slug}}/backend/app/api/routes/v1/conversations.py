@@ -33,6 +33,9 @@ from app.api.deps import ConversationShareSvc, CurrentAdmin, CurrentUser
 from app.api.deps import MessageRatingSvc
 {%- endif %}
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+from app.api.deps import ActiveOrg
+{%- endif %}
 from app.schemas.conversation import (
     ConversationCreate,
     ConversationList,
@@ -45,6 +48,9 @@ from app.schemas.conversation import (
     MessageReadSimple,
 {%- if cookiecutter.use_jwt %}
     ConversationAdminList,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    ConversationKBSettings,
 {%- endif %}
 )
 {%- if cookiecutter.use_jwt %}
@@ -104,6 +110,9 @@ async def list_conversations(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     skip: int = Query(0, ge=0, description="Number of conversations to skip"),
     limit: int = Query(50, ge=1, le=100, description="Maximum conversations to return"),
     include_archived: bool = Query(False, description="Include archived conversations"),
@@ -115,6 +124,9 @@ async def list_conversations(
     items, total = await conversation_service.list_conversations(
 {%- if cookiecutter.use_jwt %}
         user_id=current_user.id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=active_org.id,
 {%- endif %}
         skip=skip,
         limit=limit,
@@ -129,6 +141,9 @@ async def create_conversation(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     data: ConversationCreate | None = None,
 ) -> Any:
     """Create a new conversation.
@@ -139,6 +154,9 @@ async def create_conversation(
         data = ConversationCreate()
 {%- if cookiecutter.use_jwt %}
     data = data.model_copy(update={"user_id": current_user.id})
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    data = data.model_copy(update={"organization_id": active_org.id})
 {%- endif %}
     return await conversation_service.create_conversation(data)
 
@@ -182,6 +200,28 @@ async def update_conversation(
         user_id=current_user.id,
 {%- endif %}
     )
+
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+
+
+@router.patch("/{conversation_id}/kb-settings", response_model=ConversationRead)
+async def update_kb_settings(
+    conversation_id: UUID,
+    data: ConversationKBSettings,
+    conversation_service: ConversationSvc,
+    current_user: CurrentUser,
+) -> Any:
+    """Update which Knowledge Bases are active for this conversation.
+
+    Send null to restore defaults, [] to disable RAG, or [id,...] for explicit selection.
+    """
+    return await conversation_service.update_kb_settings(
+        conversation_id,
+        data.active_knowledge_base_ids,
+        user_id=current_user.id,
+    )
+{%- endif %}
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -386,6 +426,9 @@ def list_conversations(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     skip: int = Query(0, ge=0, description="Number of conversations to skip"),
     limit: int = Query(50, ge=1, le=100, description="Maximum conversations to return"),
     include_archived: bool = Query(False, description="Include archived conversations"),
@@ -397,6 +440,9 @@ def list_conversations(
     items, total = conversation_service.list_conversations(
 {%- if cookiecutter.use_jwt %}
         user_id=str(current_user.id),
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=str(active_org.id),
 {%- endif %}
         skip=skip,
         limit=limit,
@@ -411,6 +457,9 @@ def create_conversation(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     data: ConversationCreate | None = None,
 ) -> Any:
     """Create a new conversation.
@@ -421,6 +470,9 @@ def create_conversation(
         data = ConversationCreate()
 {%- if cookiecutter.use_jwt %}
     data = data.model_copy(update={"user_id": str(current_user.id)})
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    data = data.model_copy(update={"organization_id": str(active_org.id)})
 {%- endif %}
     return conversation_service.create_conversation(data)
 
@@ -464,6 +516,28 @@ def update_conversation(
         user_id=str(current_user.id),
 {%- endif %}
     )
+
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+
+
+@router.patch("/{conversation_id}/kb-settings", response_model=ConversationRead)
+def update_kb_settings(
+    conversation_id: str,
+    data: ConversationKBSettings,
+    conversation_service: ConversationSvc,
+    current_user: CurrentUser,
+) -> Any:
+    """Update which Knowledge Bases are active for this conversation.
+
+    Send null to restore defaults, [] to disable RAG, or [id,...] for explicit selection.
+    """
+    return conversation_service.update_kb_settings(
+        conversation_id,
+        data.active_knowledge_base_ids,
+        user_id=str(current_user.id),
+    )
+{%- endif %}
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
@@ -657,6 +731,9 @@ async def list_conversations(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     skip: int = Query(0, ge=0, description="Number of conversations to skip"),
     limit: int = Query(50, ge=1, le=100, description="Maximum conversations to return"),
     include_archived: bool = Query(False, description="Include archived conversations"),
@@ -668,6 +745,9 @@ async def list_conversations(
     items, total = await conversation_service.list_conversations(
 {%- if cookiecutter.use_jwt %}
         user_id=str(current_user.id),
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=str(active_org.id),
 {%- endif %}
         skip=skip,
         limit=limit,
@@ -682,6 +762,9 @@ async def create_conversation(
 {%- if cookiecutter.use_jwt %}
     current_user: CurrentUser,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    active_org: ActiveOrg,
+{%- endif %}
     data: ConversationCreate | None = None,
 ) -> Any:
     """Create a new conversation.
@@ -692,6 +775,9 @@ async def create_conversation(
         data = ConversationCreate()
 {%- if cookiecutter.use_jwt %}
     data = data.model_copy(update={"user_id": str(current_user.id)})
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    data = data.model_copy(update={"organization_id": str(active_org.id)})
 {%- endif %}
     return await conversation_service.create_conversation(data)
 
@@ -735,6 +821,28 @@ async def update_conversation(
         user_id=str(current_user.id),
 {%- endif %}
     )
+
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+
+
+@router.patch("/{conversation_id}/kb-settings", response_model=ConversationRead)
+async def update_kb_settings(
+    conversation_id: str,
+    data: ConversationKBSettings,
+    conversation_service: ConversationSvc,
+    current_user: CurrentUser,
+) -> Any:
+    """Update which Knowledge Bases are active for this conversation.
+
+    Send null to restore defaults, [] to disable RAG, or [id,...] for explicit selection.
+    """
+    return await conversation_service.update_kb_settings(
+        conversation_id,
+        data.active_knowledge_base_ids,
+        user_id=str(current_user.id),
+    )
+{%- endif %}
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)

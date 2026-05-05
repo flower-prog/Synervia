@@ -8,15 +8,27 @@ import { ThemeToggle } from "@/components/theme";
 import { LanguageSwitcherCompact } from "@/components/language-switcher";
 import { APP_NAME, ROUTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { LogOut, Menu, LayoutDashboard, MessageSquare{%- if cookiecutter.enable_rag %}, Database{%- endif %}{%- if cookiecutter.use_jwt %}, UserCircle{%- endif %} } from "lucide-react";
+import { LogOut, Menu, LayoutDashboard, MessageSquare{%- if cookiecutter.enable_rag %}, Database{%- endif %}{%- if cookiecutter.use_jwt %}, UserCircle{%- endif %}{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}, Building2{%- endif %}{%- if cookiecutter.enable_billing and cookiecutter.enable_teams %}, CreditCard{%- endif %} } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
 import { useSidebarStore } from "@/stores";
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+import { OrgSwitcher } from "@/components/teams";
+{%- endif %}
 
 const adminNavItems = [
   { name: "Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard, adminOnly: true },
   { name: "Chat", href: ROUTES.CHAT, icon: MessageSquare, adminOnly: false },
-{%- if cookiecutter.enable_rag %}
+{%- if cookiecutter.enable_rag and not (cookiecutter.enable_teams and cookiecutter.use_jwt) %}
   { name: "Knowledge Base", href: ROUTES.RAG, icon: Database, adminOnly: true },
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+  { name: "Knowledge Bases", href: ROUTES.KB, icon: Database, adminOnly: false },
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+  { name: "Organizations", href: ROUTES.ORGS, icon: Building2, adminOnly: false },
+{%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams %}
+  { name: "Billing", href: ROUTES.BILLING, icon: CreditCard, adminOnly: false },
 {%- endif %}
 {%- if cookiecutter.use_jwt %}
   { name: "Profile", href: ROUTES.PROFILE, icon: UserCircle, adminOnly: false },
@@ -66,8 +78,11 @@ export function Header() {
           </nav>
         </div>
 
-        {/* Right: language, theme, user */}
+        {/* Right: org switcher, language, theme, user */}
         <div className="flex items-center gap-2 sm:gap-3">
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+          {isAuthenticated && <OrgSwitcher />}
+{%- endif %}
           <LanguageSwitcherCompact />
           <ThemeToggle />
           {isAuthenticated ? (

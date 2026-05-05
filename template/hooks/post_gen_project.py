@@ -48,6 +48,8 @@ use_pydantic_deep = "{{ cookiecutter.use_pydantic_deep }}" == "True"
 use_telegram = "{{ cookiecutter.use_telegram }}" == "True"
 use_slack = "{{ cookiecutter.use_slack }}" == "True"
 enable_docker = "{{ cookiecutter.enable_docker }}" == "True"
+enable_teams = "{{ cookiecutter.enable_teams }}" == "True"
+enable_billing = "{{ cookiecutter.enable_billing }}" == "True"
 
 
 def remove_file(path: str) -> None:
@@ -492,5 +494,87 @@ if use_frontend and os.path.exists(frontend_dir):
         print("Frontend formatting complete.")
     else:
         print("Warning: bun/npx not found. Run 'bun run format' in frontend/ to format code.")
+
+# --- Teams: remove teams-specific files if enable_teams is false ---
+if not enable_teams:
+    remove_file(os.path.join(backend_app, "db", "models", "organization.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "audit_log.py"))
+    remove_file(os.path.join(backend_app, "schemas", "organization.py"))
+    remove_file(os.path.join(backend_app, "repositories", "organization.py"))
+    remove_file(os.path.join(backend_app, "repositories", "member.py"))
+    remove_file(os.path.join(backend_app, "repositories", "invitation.py"))
+    remove_file(os.path.join(backend_app, "services", "organization.py"))
+    remove_file(os.path.join(backend_app, "services", "member.py"))
+    remove_file(os.path.join(backend_app, "services", "invitation.py"))
+    remove_file(os.path.join(backend_app, "core", "audit.py"))
+    remove_file(os.path.join(backend_app, "commands", "create_app_admin.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "organizations.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "members.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "invitations.py"))
+    remove_file(os.path.join(backend_tests, "test_rbac_teams.py"))
+    remove_file(os.path.join(backend_tests, "test_services_members.py"))
+    remove_file(os.path.join(backend_tests, "test_tenant_isolation.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "knowledge_base.py"))
+    remove_file(os.path.join(backend_app, "schemas", "knowledge_base.py"))
+    remove_file(os.path.join(backend_app, "repositories", "knowledge_base.py"))
+    remove_file(os.path.join(backend_app, "services", "knowledge_base.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "knowledge_bases.py"))
+    remove_file(os.path.join(backend_tests, "test_kb_scoping.py"))
+    remove_file(os.path.join(backend_tests, "test_conversation_kb_toggle.py"))
+    remove_file(os.path.join(backend_app, "services", "billing.py"))
+    remove_file(os.path.join(backend_app, "schemas", "billing.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "billing.py"))
+    remove_file(os.path.join(backend_tests, "test_stripe_seats.py"))
+    # Frontend teams files
+    if use_frontend:
+        frontend_src = os.path.join(os.getcwd(), "frontend", "src")
+        remove_dir(os.path.join(frontend_src, "components", "teams"))
+        remove_dir(os.path.join(frontend_src, "app", "api", "orgs"))
+        remove_dir(os.path.join(frontend_src, "app", "api", "invitations"))
+        remove_dir(os.path.join(frontend_src, "app", "[locale]", "(dashboard)", "orgs"))
+        remove_dir(os.path.join(frontend_src, "app", "[locale]", "(dashboard)", "invitations"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-organizations.ts"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-members.ts"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-invitations.ts"))
+        remove_file(os.path.join(frontend_src, "stores", "org-store.ts"))
+        remove_file(os.path.join(frontend_src, "types", "organization.ts"))
+        # Also remove KB/billing frontend since they depend on teams
+        remove_dir(os.path.join(frontend_src, "components", "kb"))
+        remove_dir(os.path.join(frontend_src, "app", "api", "kb"))
+        remove_dir(os.path.join(frontend_src, "app", "[locale]", "(dashboard)", "kb"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-knowledge-bases.ts"))
+        remove_file(os.path.join(frontend_src, "types", "knowledge-base.ts"))
+        remove_dir(os.path.join(frontend_src, "components", "billing"))
+        remove_dir(os.path.join(frontend_src, "app", "api", "billing"))
+        remove_dir(os.path.join(frontend_src, "app", "[locale]", "(dashboard)", "billing"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-billing.ts"))
+        remove_file(os.path.join(frontend_src, "types", "billing.ts"))
+
+# --- Billing: remove billing-specific files if enable_billing is false ---
+if not enable_billing:
+    remove_file(os.path.join(backend_app, "services", "billing.py"))
+    remove_file(os.path.join(backend_app, "schemas", "billing.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "billing.py"))
+    remove_file(os.path.join(backend_tests, "test_stripe_seats.py"))
+    # Remove the entire billing module
+    remove_dir(os.path.join(backend_app, "billing"))
+    # Remove billing repositories and models
+    remove_file(os.path.join(backend_app, "repositories", "plan.py"))
+    remove_file(os.path.join(backend_app, "repositories", "subscription.py"))
+    remove_file(os.path.join(backend_app, "repositories", "stripe_event.py"))
+    remove_file(os.path.join(backend_app, "repositories", "credit_transaction.py"))
+    remove_file(os.path.join(backend_app, "repositories", "usage_event.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "plan.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "subscription.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "stripe_event.py"))
+    remove_file(os.path.join(backend_app, "db", "models", "credit_transaction.py"))
+    remove_file(os.path.join(backend_app, "commands", "sync_stripe_plans.py"))
+    if use_frontend:
+        frontend_src = os.path.join(os.getcwd(), "frontend", "src")
+        remove_dir(os.path.join(frontend_src, "components", "billing"))
+        remove_dir(os.path.join(frontend_src, "app", "api", "billing"))
+        remove_dir(os.path.join(frontend_src, "app", "[locale]", "(dashboard)", "billing"))
+        remove_file(os.path.join(frontend_src, "hooks", "use-billing.ts"))
+        remove_file(os.path.join(frontend_src, "types", "billing.ts"))
 
 print("Project generated successfully!")

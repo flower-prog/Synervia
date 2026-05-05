@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Email module** (`enable_email`) — Transactional email system with three providers: Resend (async), SMTP (aiosmtplib), and Log (dev/test). Pre-rendered HTML/text templates stored in `emails/dist/` using `[[variable]]` substitution. `EmailService` facade with convenience wrappers for all email types: welcome, password reset, invitation, payment succeeded/failed, trial ending/expired, subscription canceled/changed, low credits, newsletter welcome
+- **Email triggers wired** — `UserService.register()` fires `send_welcome`; `InvitationService.invite()` fires `send_invitation`; billing webhook handlers fire payment/subscription lifecycle emails using Stripe customer data (fail-open — email errors never break webhook processing)
+- **Stripe billing — rate limiting per plan** (`enable_rate_limiting`) — Sliding window rate limiter backed by Redis sorted sets (ZADD/ZREMRANGEBYSCORE/ZCARD pipeline) with in-memory fallback. `RateLimitRule` frozen dataclass (per_user, per_org, per_ip, configurable periods); `RateLimitCategory` constants; data-driven plan features override `DEFAULT_RATE_LIMITS`; `make_rate_limit_dep(category)` factory for FastAPI `Depends()`; admin bypass; fail-open on Redis error; HTTP 429 with `Retry-After` header
+- **Extended frontend billing dashboard** — `SubscriptionPanel` with 4 states (free/trial/active/canceled), cancel/reactivate dialogs, plan details; `CreditsPanel` with balance display, low-credit alert, top-up button, transaction history with type badges; `/billing/subscription` page with live plan cards; `/billing/credits` page. `useSubscription`, `useCredits`, `usePlans` hooks added to `use-billing.ts`
+- **Admin user management** — `GET/PATCH/DELETE /admin/users/{id}` endpoints (requires `is_app_admin` flag). `POST /admin/users/{id}/impersonate` issues a short-lived (1h) JWT token to act as any user — token is returned in the API response. Frontend: `/admin/users` page with search, role toggle, delete, and impersonation-token-to-clipboard button; `/admin/page.tsx` overview with navigation cards; `useAdminUsers` hook
+- **UsageService** — `app/services/usage.py` — records `UsageEvent` in DB, computes credits via `usage_to_credits()`, debits org credits via `CreditService.debit()`. All 3 DB variants (PG/SQLite/MongoDB). Wiring point for agent invocations
+- **Usage dashboard** — `/billing/usage` frontend page: total credits/tokens/calls KPI cards, recharts bar chart of credits by model, per-model breakdown table, CSV export of credit transaction history
+- **Anomaly detection service** (`enable_usage_anomaly_detection`) — `anomaly_detection.py` — spike detection: current-hour credits vs rolling 24h average; alert if ratio > 3×; optional Slack webhook notification (`enable_slack_alerts`, `SLACK_ANOMALY_WEBHOOK_URL` setting)
+- **Newsletter signup** (`enable_newsletter_signup`) — `POST /newsletter/signup` endpoint; `NewsletterSignup` React component; sends welcome email via email service
+- **Changelog page** (`enable_changelog`) — `/changelog` route with release history, change type badges (feat/fix/improvement/chore)
+- **Pricing comparison page** (`enable_comparison_pages`) — `/pricing` route fetches live plans from API; monthly/annual toggle; plan feature list; trial days display; "Get Started" CTA
+
 ## [0.2.7] - 2026-04-26
 
 ### Fixed

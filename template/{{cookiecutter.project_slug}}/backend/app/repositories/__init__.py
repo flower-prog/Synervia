@@ -40,6 +40,12 @@ from app.repositories import channel_bot as channel_bot_repo
 from app.repositories import channel_identity as channel_identity_repo
 from app.repositories import channel_session as channel_session_repo
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+
+from app.repositories import invitation as invitation_repo
+from app.repositories import member as member_repo
+from app.repositories import organization as organization_repo
+{%- endif %}
 
 __all__ = [
 {%- if cookiecutter.use_jwt %}
@@ -71,5 +77,10 @@ __all__ = [
     "channel_bot_repo",
     "channel_identity_repo",
     "channel_session_repo",
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    "organization_repo",
+    "member_repo",
+    "invitation_repo",
 {%- endif %}
 ]

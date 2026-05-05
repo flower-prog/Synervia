@@ -203,6 +203,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
         user_id: UUID | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id: UUID | None = None,
+{%- endif %}
         *,
         skip: int = 0,
         limit: int = 50,
@@ -218,6 +221,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
+{%- endif %}
             skip=skip,
             limit=limit,
             include_archived=include_archived,
@@ -226,6 +232,9 @@ class ConversationService:
             self.db,
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
 {%- endif %}
             include_archived=include_archived,
         )
@@ -313,6 +322,9 @@ class ConversationService:
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
             project_id=data.project_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=getattr(data, "organization_id", None),
+{%- endif %}
             title=data.title,
         )
 
@@ -339,6 +351,26 @@ class ConversationService:
         return await conversation_repo.update_conversation(
             self.db, db_conversation=conversation, update_data=update_data
         )
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    async def update_kb_settings(
+        self,
+        conversation_id: UUID,
+        active_knowledge_base_ids: list[str] | None,
+        user_id: UUID | None = None,
+    ) -> Conversation:
+        """Update active KB selection for a conversation.
+
+        Raises:
+            NotFoundError: If conversation does not exist or user has no access.
+        """
+        conversation = await self.get_conversation(conversation_id, user_id=user_id)
+        return await conversation_repo.update_conversation(
+            self.db,
+            db_conversation=conversation,
+            update_data={"active_knowledge_base_ids": active_knowledge_base_ids},
+        )
+{%- endif %}
 
     async def archive_conversation(
         self,
@@ -808,6 +840,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
         user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id: str | None = None,
+{%- endif %}
         *,
         skip: int = 0,
         limit: int = 50,
@@ -823,6 +858,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
+{%- endif %}
             skip=skip,
             limit=limit,
             include_archived=include_archived,
@@ -831,6 +869,9 @@ class ConversationService:
             self.db,
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
 {%- endif %}
             include_archived=include_archived,
         )
@@ -915,6 +956,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=data.user_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=getattr(data, "organization_id", None),
+{%- endif %}
             title=data.title,
         )
 
@@ -941,6 +985,28 @@ class ConversationService:
         return conversation_repo.update_conversation(
             self.db, db_conversation=conversation, update_data=update_data
         )
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    def update_kb_settings(
+        self,
+        conversation_id: str,
+        active_knowledge_base_ids: list[str] | None,
+        user_id: str | None = None,
+    ) -> Conversation:
+        """Update active KB selection for a conversation.
+
+        Raises:
+            NotFoundError: If conversation does not exist or user has no access.
+        """
+        import json
+        conversation = self.get_conversation(conversation_id, user_id=user_id)
+        serialized = json.dumps(active_knowledge_base_ids) if active_knowledge_base_ids is not None else None
+        return conversation_repo.update_conversation(
+            self.db,
+            db_conversation=conversation,
+            update_data={"active_knowledge_base_ids": serialized},
+        )
+{%- endif %}
 
     def archive_conversation(
         self,
@@ -1284,6 +1350,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
         user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id: str | None = None,
+{%- endif %}
         *,
         skip: int = 0,
         limit: int = 50,
@@ -1298,6 +1367,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
+{%- endif %}
             skip=skip,
             limit=limit,
             include_archived=include_archived,
@@ -1305,6 +1377,9 @@ class ConversationService:
         total = await conversation_repo.count_conversations(
 {%- if cookiecutter.use_jwt %}
             user_id=user_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=organization_id,
 {%- endif %}
             include_archived=include_archived,
         )
@@ -1386,6 +1461,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=data.user_id,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+            organization_id=getattr(data, "organization_id", None),
+{%- endif %}
             title=data.title,
         )
 
@@ -1412,6 +1490,25 @@ class ConversationService:
         return await conversation_repo.update_conversation(
             db_conversation=conversation, update_data=update_data
         )
+
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+    async def update_kb_settings(
+        self,
+        conversation_id: str,
+        active_knowledge_base_ids: list[str] | None,
+        user_id: str | None = None,
+    ) -> Conversation:
+        """Update active KB selection for a conversation.
+
+        Raises:
+            NotFoundError: If conversation does not exist or user has no access.
+        """
+        conversation = await self.get_conversation(conversation_id, user_id=user_id)
+        return await conversation_repo.update_conversation(
+            db_conversation=conversation,
+            update_data={"active_knowledge_base_ids": active_knowledge_base_ids},
+        )
+{%- endif %}
 
     async def archive_conversation(
         self,

@@ -44,6 +44,9 @@ async def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     user_id: UUID | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: UUID | None = None,
+{%- endif %}
     *,
     skip: int = 0,
     limit: int = 50,
@@ -54,6 +57,10 @@ async def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query = query.where(Conversation.user_id == user_id)
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query = query.where(Conversation.organization_id == organization_id)
 {%- endif %}
     if not include_archived:
         query = query.where(Conversation.is_archived == False)  # noqa: E712
@@ -190,6 +197,9 @@ async def count_conversations(
 {%- if cookiecutter.use_jwt %}
     user_id: UUID | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: UUID | None = None,
+{%- endif %}
     *,
     include_archived: bool = False,
 ) -> int:
@@ -198,6 +208,10 @@ async def count_conversations(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query = query.where(Conversation.user_id == user_id)
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query = query.where(Conversation.organization_id == organization_id)
 {%- endif %}
     if not include_archived:
         query = query.where(Conversation.is_archived == False)  # noqa: E712
@@ -211,6 +225,9 @@ async def create_conversation(
 {%- if cookiecutter.use_jwt %}
     user_id: UUID | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: UUID | None = None,
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: UUID | None = None,
 {%- endif %}
@@ -220,6 +237,9 @@ async def create_conversation(
     conversation = Conversation(
 {%- if cookiecutter.use_jwt %}
         user_id=user_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=organization_id,
 {%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
         project_id=project_id,
@@ -463,6 +483,9 @@ def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: str | None = None,
+{%- endif %}
     *,
     skip: int = 0,
     limit: int = 50,
@@ -473,6 +496,10 @@ def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query = query.where(Conversation.user_id == user_id)
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query = query.where(Conversation.organization_id == organization_id)
 {%- endif %}
     if not include_archived:
         query = query.where(Conversation.is_archived == False)  # noqa: E712
@@ -605,6 +632,9 @@ def count_conversations(
 {%- if cookiecutter.use_jwt %}
     user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: str | None = None,
+{%- endif %}
     *,
     include_archived: bool = False,
 ) -> int:
@@ -613,6 +643,10 @@ def count_conversations(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query = query.where(Conversation.user_id == user_id)
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query = query.where(Conversation.organization_id == organization_id)
 {%- endif %}
     if not include_archived:
         query = query.where(Conversation.is_archived == False)  # noqa: E712
@@ -629,6 +663,9 @@ def create_conversation(
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: str | None = None,
+{%- endif %}
     title: str | None = None,
 ) -> Conversation:
     """Create a new conversation."""
@@ -638,6 +675,9 @@ def create_conversation(
 {%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
         project_id=project_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=organization_id,
 {%- endif %}
         title=title,
     )
@@ -880,6 +920,9 @@ async def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: str | None = None,
+{%- endif %}
     *,
     skip: int = 0,
     limit: int = 50,
@@ -890,6 +933,10 @@ async def get_conversations_by_user(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query_filter["user_id"] = user_id
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query_filter["organization_id"] = organization_id
 {%- endif %}
     if not include_archived:
         query_filter["is_archived"] = False
@@ -1021,6 +1068,9 @@ async def count_conversations(
 {%- if cookiecutter.use_jwt %}
     user_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+    organization_id: str | None = None,
+{%- endif %}
     *,
     include_archived: bool = False,
 ) -> int:
@@ -1029,6 +1079,10 @@ async def count_conversations(
 {%- if cookiecutter.use_jwt %}
     if user_id:
         query_filter["user_id"] = user_id
+{%- endif %}
+{%- if cookiecutter.enable_teams %}
+    if organization_id is not None:
+        query_filter["organization_id"] = organization_id
 {%- endif %}
     if not include_archived:
         query_filter["is_archived"] = False
@@ -1044,6 +1098,9 @@ async def create_conversation(
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
     project_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+    organization_id: str | None = None,
+{%- endif %}
     title: str | None = None,
 ) -> Conversation:
     """Create a new conversation."""
@@ -1053,6 +1110,9 @@ async def create_conversation(
 {%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
         project_id=project_id,
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
+        organization_id=organization_id,
 {%- endif %}
         title=title,
     )

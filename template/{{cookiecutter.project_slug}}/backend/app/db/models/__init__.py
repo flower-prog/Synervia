@@ -46,6 +46,15 @@ from app.db.models.channel_bot import ChannelBot
 from app.db.models.channel_identity import ChannelIdentity
 from app.db.models.channel_session import ChannelSession
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+{%- set _ = models.extend(["Organization", "OrganizationMember", "Invitation", "AppAdminAuditLog"]) %}
+from app.db.models.organization import Invitation, Organization, OrganizationMember
+from app.db.models.audit_log import AppAdminAuditLog
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+{%- set _ = models.append("KnowledgeBase") %}
+from app.db.models.knowledge_base import KnowledgeBase
+{%- endif %}
 {%- if models %}
 
 __all__ = {{ models }}

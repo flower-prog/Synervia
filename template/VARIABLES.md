@@ -339,6 +339,23 @@ These variables are set automatically by the generator.
 
 ---
 
+## Teams & Billing
+
+| Variable | Type | Default | Description | Dependencies |
+|----------|------|---------|-------------|--------------|
+| `enable_teams` | bool | `false` | Enable multi-tenant teams: Organizations, OrganizationMembers, Invitations, role-based access (OWNER/ADMIN/MEMBER/VIEWER), Personal Org auto-create on signup | Requires JWT auth + SQL DB |
+| `enable_billing` | bool | `false` | Enable billing fields on Organization (stripe_customer_id, subscription_tier, credits_balance, trial_ends_at) | Requires `enable_teams` |
+
+**Notes:**
+
+- When `enable_teams=true`, every new user gets a Personal Organization (is_personal=True) automatically on registration
+- All resources (Conversations, RAGDocuments, etc.) are scoped to an Organization via `organization_id`
+- Active organization context is passed via `X-Organization-Id` header (falls back to Personal Org if omitted)
+- Roles hierarchy: OWNER > ADMIN > MEMBER > VIEWER. VIEWERs are non-billable read-only collaborators
+- Personal Org is hard-capped at 1 member (the owner) and cannot be deleted
+
+---
+
 ## Variable Naming Conventions
 
 The template uses consistent naming patterns:

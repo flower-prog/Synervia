@@ -36,6 +36,13 @@ from app.db.models.rag_document import RAGDocument  # noqa: F401
 from app.db.models.sync_log import SyncLog  # noqa: F401
 from app.db.models.sync_source import SyncSource  # noqa: F401
 {%- endif %}
+{%- if cookiecutter.enable_teams %}
+from app.db.models.organization import Invitation, Organization, OrganizationMember  # noqa: F401
+from app.db.models.audit_log import AppAdminAuditLog  # noqa: F401
+{%- endif %}
+{%- if cookiecutter.enable_teams and cookiecutter.enable_rag and cookiecutter.use_jwt %}
+from app.db.models.knowledge_base import KnowledgeBase  # noqa: F401
+{%- endif %}
 
 config = context.config
 

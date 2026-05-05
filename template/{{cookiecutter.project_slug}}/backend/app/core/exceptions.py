@@ -95,6 +95,14 @@ class BadRequestError(AppException):
     status_code = 400
 
 
+class PaymentRequiredError(AppException):
+    """Payment required — seat or usage limit reached (402)."""
+
+    message = "Payment required"
+    code = "PAYMENT_REQUIRED"
+    status_code = 402
+
+
 # === 5xx Server Errors ===
 
 
