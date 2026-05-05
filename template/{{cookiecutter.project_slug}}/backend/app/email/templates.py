@@ -5,8 +5,8 @@ from pathlib import Path
 
 from app.email.exceptions import EmailTemplateError
 
-# Emails dist directory sits alongside `backend/` at the project root
-_DIST_DIR = Path(__file__).parent.parent.parent.parent / "emails" / "dist"
+# Emails compiled directory sits alongside `backend/` at the project root
+_DIST_DIR = Path(__file__).parent.parent.parent.parent / "emails" / "compiled"
 
 
 def _load_raw(key: str, ext: str) -> str:
