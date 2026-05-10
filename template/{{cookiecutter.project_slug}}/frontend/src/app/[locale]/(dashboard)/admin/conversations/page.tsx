@@ -177,13 +177,13 @@ export default function AdminConversationsPage() {
                   {msg.tool_calls.map((tc) => (
                     <ToolCallCard
                       key={tc.id}
-                      toolCall={{
+                      toolCall={ {
                         id: tc.id,
                         name: tc.tool_name,
                         args: tc.args,
                         result: tc.result,
                         status: tc.status === "failed" ? "error" : tc.status,
-                      }}
+                      } }
                     />
                   ))}
                 </div>

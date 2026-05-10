@@ -63,6 +63,17 @@ function formatCurrency(amountCents: number, currency = "USD"): string {
   });
 }
 
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return "0 B";
+  const KB = 1024;
+  const MB = KB * 1024;
+  const GB = MB * 1024;
+  if (bytes >= GB) return `${(bytes / GB).toFixed(2)} GB`;
+  if (bytes >= MB) return `${(bytes / MB).toFixed(1)} MB`;
+  if (bytes >= KB) return `${Math.round(bytes / KB)} KB`;
+  return `${bytes} B`;
+}
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -227,9 +238,9 @@ export default function BillingHubPage() {
           <UsageGauge
             label="Storage"
             icon={HardDrive}
-            used={storage ? storage.total_bytes / 1_073_741_824 : 0}
-            limit={storage ? storage.limit_bytes / 1_073_741_824 : 0}
-            unit="GB"
+            used={storage?.total_bytes ?? 0}
+            limit={storage?.limit_bytes ?? 0}
+            format={formatBytes}
             hint={
               storage ? `Chat attachments + indexed RAG documents` : "Failed to load storage usage"
             }

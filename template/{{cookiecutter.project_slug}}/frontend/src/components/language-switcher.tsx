@@ -1,12 +1,30 @@
-{% raw %}"use client";
+"use client";
 
 import { Globe } from "lucide-react";
 import { useLocale } from "next-intl";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { locales, type Locale, getLocaleLabel, getLocaleFlag } from "@/i18n";
+import { locales, defaultLocale, type Locale, getLocaleLabel, getLocaleFlag } from "@/i18n";
 import { cn } from "@/lib/utils";
+
+/**
+ * Build a path for the given locale, preserving the rest of the route.
+ * Handles `localePrefix: "as-needed"` — default locale has no prefix.
+ */
+function buildLocalizedPath(pathname: string, newLocale: Locale): string {
+  const segments = pathname.split("/").filter(Boolean);
+  // Strip existing locale prefix if present
+  const first = segments[0];
+  if (first && (locales as readonly string[]).includes(first)) {
+    segments.shift();
+  }
+  const rest = segments.join("/");
+  if (newLocale === defaultLocale) {
+    return rest ? `/${rest}` : "/";
+  }
+  return rest ? `/${newLocale}/${rest}` : `/${newLocale}`;
+}
 
 /**
  * Default language switcher — segmented pills (EN | PL).
@@ -18,9 +36,7 @@ export function LanguageSwitcher() {
   const pathname = usePathname();
 
   const handleChange = (newLocale: Locale) => {
-    const segments = pathname.split("/");
-    segments[1] = newLocale;
-    router.push(segments.join("/"));
+    router.push(buildLocalizedPath(pathname, newLocale));
   };
 
   return (
@@ -75,9 +91,7 @@ export function LanguageSwitcherCompact() {
   }, [open]);
 
   const handleChange = (newLocale: Locale) => {
-    const segments = pathname.split("/");
-    segments[1] = newLocale;
-    router.push(segments.join("/"));
+    router.push(buildLocalizedPath(pathname, newLocale));
     setOpen(false);
   };
 
@@ -92,8 +106,8 @@ export function LanguageSwitcherCompact() {
         className={cn(
           "border-foreground/15 hover:border-foreground/40 hover:bg-foreground/[0.04]",
           "text-foreground/85 inline-flex items-center gap-1.5 rounded-full border bg-transparent",
-          "px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+          "px-3 py-1.5 text-xs font-medium tracking-wider uppercase transition-colors",
+          "focus-visible:ring-brand/50 focus-visible:ring-2 focus-visible:outline-none",
         )}
       >
         <Globe className="h-3.5 w-3.5" aria-hidden />
@@ -104,13 +118,13 @@ export function LanguageSwitcherCompact() {
         <div
           role="menu"
           className={cn(
-            "border-foreground/10 bg-card text-card-foreground absolute right-0 top-full",
+            "border-foreground/10 bg-card text-card-foreground absolute top-full right-0",
             "mt-2 min-w-[180px] origin-top-right overflow-hidden rounded-2xl border",
             "shadow-lg shadow-black/5 backdrop-blur",
           )}
-          style={{
+          style={ {
             animation: "lsFadeIn 140ms cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
+          } }
         >
           {locales.map((loc) => {
             const active = loc === locale;
@@ -135,7 +149,7 @@ export function LanguageSwitcherCompact() {
                 <span
                   aria-hidden
                   className={cn(
-                    "font-mono text-[10px] uppercase tracking-wider",
+                    "font-mono text-[10px] tracking-wider uppercase",
                     active ? "text-brand" : "text-foreground/40",
                   )}
                 >
@@ -149,4 +163,3 @@ export function LanguageSwitcherCompact() {
     </div>
   );
 }
-{% endraw %}

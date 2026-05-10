@@ -5,8 +5,26 @@ import { useLocale } from "next-intl";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { locales, type Locale, getLocaleLabel, getLocaleFlag } from "@/i18n";
+import { locales, defaultLocale, type Locale, getLocaleLabel, getLocaleFlag } from "@/i18n";
 import { cn } from "@/lib/utils";
+
+/**
+ * Build a path for the given locale, preserving the rest of the route.
+ * Handles `localePrefix: "as-needed"` — default locale has no prefix.
+ */
+function buildLocalizedPath(pathname: string, newLocale: Locale): string {
+  const segments = pathname.split("/").filter(Boolean);
+  // Strip existing locale prefix if present
+  const first = segments[0];
+  if (first && (locales as readonly string[]).includes(first)) {
+    segments.shift();
+  }
+  const rest = segments.join("/");
+  if (newLocale === defaultLocale) {
+    return rest ? `/${rest}` : "/";
+  }
+  return rest ? `/${newLocale}/${rest}` : `/${newLocale}`;
+}
 
 /**
  * Default language switcher — segmented pills (EN | PL).
@@ -18,9 +36,7 @@ export function LanguageSwitcher() {
   const pathname = usePathname();
 
   const handleChange = (newLocale: Locale) => {
-    const segments = pathname.split("/");
-    segments[1] = newLocale;
-    router.push(segments.join("/"));
+    router.push(buildLocalizedPath(pathname, newLocale));
   };
 
   return (
@@ -75,9 +91,7 @@ export function LanguageSwitcherCompact() {
   }, [open]);
 
   const handleChange = (newLocale: Locale) => {
-    const segments = pathname.split("/");
-    segments[1] = newLocale;
-    router.push(segments.join("/"));
+    router.push(buildLocalizedPath(pathname, newLocale));
     setOpen(false);
   };
 

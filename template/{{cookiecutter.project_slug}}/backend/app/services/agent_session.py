@@ -47,6 +47,9 @@ from app.db.session import get_db_context{% if cookiecutter.use_sqlite %}, get_d
 from contextlib import contextmanager{% endif %}
 from app.services.file_storage import get_file_storage
 {%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.services.usage import UsageService
+{%- endif %}
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +162,16 @@ class AgentSession:
                     collected_tool_calls,
                 )
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+            # Record usage + debit credits (best-effort).
+            if agent_run.result is not None and organization_id:
+                await self._record_usage(
+                    agent_run=agent_run,
+                    assistant=assistant,
+                    organization_id=organization_id,
+                )
+{%- endif %}
+
             if assistant_msg_id:
                 await send_event(
                     self.websocket,
@@ -182,6 +195,64 @@ class AgentSession:
         except Exception as e:
             logger.exception(f"Error processing agent request: {e}")
             await send_event(self.websocket, "error", {"message": str(e)})
+
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+    async def _record_usage(
+        self,
+        *,
+        agent_run: Any,
+        assistant: Any,
+        organization_id: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits for the just-finished agent run."""
+        try:
+            usage = agent_run.usage()
+        except Exception:
+            logger.exception("usage_extract_failed")
+            return
+
+        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        cached_tokens = int(getattr(usage, "cache_read_tokens", 0) or 0)
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            logger.warning("usage_record_skipped_invalid_org_id", extra={"org": organization_id})
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        try:
+            async with get_db_context() as db:
+                svc = UsageService(db)
+                await svc.record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=getattr(assistant, "model_name", "") or "",
+                    provider="{{ cookiecutter.llm_provider }}",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="pydantic_ai",
+                )
+        except Exception:
+            logger.exception("usage_record_failed", extra={"org_id": str(org_uuid)})
+{%- endif %}
 
 {%- if (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 
@@ -367,6 +438,10 @@ from app.services.agent import (
 {%- if cookiecutter.websocket_auth_jwt %}
 from app.db.models.user import User
 {%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.db.session import get_db_context
+from app.services.usage import UsageService
+{%- endif %}
 
 logger = logging.getLogger(__name__)
 
@@ -488,6 +563,16 @@ class AgentSession:
                     collected_tool_calls,
                 )
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+            # Record usage + debit credits (best-effort).
+            if final_output and organization_id and getattr(self, "_last_usage_metadata", None):
+                await self._record_usage(
+                    assistant=assistant,
+                    organization_id=organization_id,
+                    usage_metadata=self._last_usage_metadata,
+                )
+{%- endif %}
+
             if assistant_msg_id:
                 await send_event(
                     self.websocket,
@@ -512,6 +597,60 @@ class AgentSession:
             logger.exception(f"Error processing agent request: {e}")
             await send_event(self.websocket, "error", {"message": str(e)})
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+    async def _record_usage(
+        self,
+        *,
+        assistant: Any,
+        organization_id: Any,
+        usage_metadata: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits using LangChain UsageMetadata."""
+        if not usage_metadata:
+            return
+        input_tokens = int(usage_metadata.get("input_tokens") or 0)
+        output_tokens = int(usage_metadata.get("output_tokens") or 0)
+        cached_tokens = int(
+            (usage_metadata.get("input_token_details") or {}).get("cache_read") or 0
+        )
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        try:
+            async with get_db_context() as db:
+                await UsageService(db).record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=getattr(assistant, "model_name", "") or "",
+                    provider="{{ cookiecutter.llm_provider }}",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="langchain",
+                )
+        except Exception:
+            logger.exception("usage_record_failed")
+{%- endif %}
+
     async def _stream_agent_response(
         self,
         assistant: Any,
@@ -522,6 +661,10 @@ class AgentSession:
         final_output = ""
         seen_tool_call_ids: set[str] = set()
         pending: dict[str, dict[str, Any]] = {}
+        # Accumulate AIMessageChunks so we can read aggregate usage_metadata at the end.
+        # LangChain's `+` operator on AIMessageChunk merges usage_metadata across chunks.
+        self._last_usage_metadata = None
+        accumulator: AIMessageChunk | None = None
 
         await send_event(self.websocket, "model_request_start", {})
 
@@ -533,6 +676,7 @@ class AgentSession:
             if stream_mode == "messages":
                 token, _metadata = data
                 if isinstance(token, AIMessageChunk):
+                    accumulator = token if accumulator is None else accumulator + token
                     final_output += await self._stream_message_chunk(
                         token, seen_tool_call_ids
                     )
@@ -541,6 +685,8 @@ class AgentSession:
                     data, seen_tool_call_ids, pending, collected_tool_calls
                 )
 
+        if accumulator is not None:
+            self._last_usage_metadata = getattr(accumulator, "usage_metadata", None)
         await send_event(self.websocket, "final_result", {"output": final_output})
         return final_output
 
@@ -662,6 +808,10 @@ from app.services.agent import (
 {%- if cookiecutter.websocket_auth_jwt %}
 from app.db.models.user import User
 {%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.db.session import get_db_context
+from app.services.usage import UsageService
+{%- endif %}
 
 logger = logging.getLogger(__name__)
 
@@ -780,6 +930,16 @@ class AgentSession:
                     collected_tool_calls,
                 )
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+            # Record usage + debit credits (best-effort).
+            if final_output and organization_id and getattr(self, "_last_usage_metadata", None):
+                await self._record_usage(
+                    assistant=assistant,
+                    organization_id=organization_id,
+                    usage_metadata=self._last_usage_metadata,
+                )
+{%- endif %}
+
             if assistant_msg_id:
                 await send_event(
                     self.websocket,
@@ -804,6 +964,60 @@ class AgentSession:
             logger.exception(f"Error processing agent request: {e}")
             await send_event(self.websocket, "error", {"message": str(e)})
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+    async def _record_usage(
+        self,
+        *,
+        assistant: Any,
+        organization_id: Any,
+        usage_metadata: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits using LangChain UsageMetadata."""
+        if not usage_metadata:
+            return
+        input_tokens = int(usage_metadata.get("input_tokens") or 0)
+        output_tokens = int(usage_metadata.get("output_tokens") or 0)
+        cached_tokens = int(
+            (usage_metadata.get("input_token_details") or {}).get("cache_read") or 0
+        )
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        try:
+            async with get_db_context() as db:
+                await UsageService(db).record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=getattr(assistant, "model_name", "") or "",
+                    provider="{{ cookiecutter.llm_provider }}",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="langgraph",
+                )
+        except Exception:
+            logger.exception("usage_record_failed")
+{%- endif %}
+
     async def _stream_agent_response(
         self,
         assistant: Any,
@@ -814,6 +1028,8 @@ class AgentSession:
         final_output = ""
         seen_tool_call_ids: set[str] = set()
         pending: dict[str, dict[str, Any]] = {}
+        self._last_usage_metadata = None
+        accumulator: AIMessageChunk | None = None
 
         await send_event(self.websocket, "model_request_start", {})
 
@@ -823,6 +1039,7 @@ class AgentSession:
             if stream_mode == "messages":
                 chunk, _metadata = data
                 if isinstance(chunk, AIMessageChunk):
+                    accumulator = chunk if accumulator is None else accumulator + chunk
                     final_output += await self._stream_message_chunk(
                         chunk, seen_tool_call_ids
                     )
@@ -831,6 +1048,8 @@ class AgentSession:
                     data, seen_tool_call_ids, pending, collected_tool_calls
                 )
 
+        if accumulator is not None:
+            self._last_usage_metadata = getattr(accumulator, "usage_metadata", None)
         await send_event(self.websocket, "final_result", {"output": final_output})
         return final_output
 
@@ -951,6 +1170,10 @@ from app.services.agent import (
 {%- if cookiecutter.websocket_auth_jwt %}
 from app.db.models.user import User
 {%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.db.session import get_db_context
+from app.services.usage import UsageService
+{%- endif %}
 
 logger = logging.getLogger(__name__)
 
@@ -987,6 +1210,9 @@ class AgentSession:
         if not user_message and not file_ids:
             await send_event(self.websocket, "error", {"message": "Empty message"})
             return
+
+        # Reset usage tracking for the new turn.
+        self._last_usage = None
 
 {%- if cookiecutter.use_database %}
         self.current_conversation_id, newly_created, organization_id = await persist_user_turn(
@@ -1049,6 +1275,15 @@ class AgentSession:
                 self.conversation_history.append(
                     {"role": "assistant", "content": final_output}
                 )
+
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+            # Record usage + debit credits (best-effort).
+            if final_output and organization_id:
+                await self._record_usage(
+                    crew_assistant=crew_assistant,
+                    organization_id=organization_id,
+                )
+{%- endif %}
 
             await send_event(
                 self.websocket,
@@ -1170,6 +1405,7 @@ class AgentSession:
                 )
             elif event_type == "crew_complete":
                 final_output = event.get("result", "")
+                self._last_usage = event.get("usage")
                 await send_event(
                     self.websocket, "final_result", {"output": final_output}
                 )
@@ -1181,6 +1417,61 @@ class AgentSession:
                 )
 
         return final_output
+
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+    async def _record_usage(
+        self,
+        *,
+        crew_assistant: Any,
+        organization_id: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits using CrewAI usage_metrics."""
+        usage = getattr(self, "_last_usage", None)
+        if not usage:
+            return
+        input_tokens = int(usage.get("prompt_tokens") or 0)
+        output_tokens = int(usage.get("completion_tokens") or 0)
+        cached_tokens = int(usage.get("cached_prompt_tokens") or 0)
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        # CrewAI doesn't expose a single model name (multi-agent), so use config.name as a tag.
+        model = getattr(getattr(crew_assistant, "config", None), "name", "") or ""
+
+        try:
+            async with get_db_context() as db:
+                await UsageService(db).record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=model,
+                    provider="{{ cookiecutter.llm_provider }}",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="crewai",
+                )
+        except Exception:
+            logger.exception("usage_record_failed")
+{%- endif %}
 {%- elif cookiecutter.use_deepagents %}
 """Per-connection AI agent session (DeepAgents) with human-in-the-loop support."""
 
@@ -1214,6 +1505,9 @@ from app.db.models.user import User
 from app.api.deps import get_conversation_service
 from app.db.session import get_db_context{% if cookiecutter.use_sqlite %}, get_db_session
 from contextlib import contextmanager{% endif %}
+{%- endif %}
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.services.usage import UsageService
 {%- endif %}
 
 logger = logging.getLogger(__name__)
@@ -1333,6 +1627,9 @@ class AgentSession:
             await send_event(self.websocket, "error", {"message": "Empty message"})
             return
 
+        # Reset usage tracking for the new turn (drive_stream accumulates across resumes).
+        self._last_usage_metadata = None
+
         # Re-instantiate the assistant if the client toggled thinking effort
         # between turns. The graph caches the model with thinking baked in, so
         # we rebuild lazily to honor the new setting.
@@ -1443,6 +1740,15 @@ class AgentSession:
                     collected_tool_calls,
                 )
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+            # Record usage + debit credits (best-effort).
+            if final_output and organization_id and getattr(self, "_last_usage_metadata", None):
+                await self._record_usage(
+                    organization_id=organization_id,
+                    usage_metadata=self._last_usage_metadata,
+                )
+{%- endif %}
+
             if assistant_msg_id:
                 await send_event(
                     self.websocket,
@@ -1467,6 +1773,59 @@ class AgentSession:
             logger.exception(f"Error processing agent request: {e}")
             await send_event(self.websocket, "error", {"message": str(e)})
 
+{%- if cookiecutter.enable_billing and cookiecutter.enable_teams and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+    async def _record_usage(
+        self,
+        *,
+        organization_id: Any,
+        usage_metadata: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits using LangChain UsageMetadata."""
+        if not usage_metadata:
+            return
+        input_tokens = int(usage_metadata.get("input_tokens") or 0)
+        output_tokens = int(usage_metadata.get("output_tokens") or 0)
+        cached_tokens = int(
+            (usage_metadata.get("input_token_details") or {}).get("cache_read") or 0
+        )
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        try:
+            async with get_db_context() as db:
+                await UsageService(db).record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=getattr(self.assistant, "model_name", "") or "",
+                    provider="{{ cookiecutter.llm_provider }}",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="deepagents",
+                )
+        except Exception:
+            logger.exception("usage_record_failed")
+{%- endif %}
+
     async def _drive_stream(
         self,
         stream_iter: Any,
@@ -1477,6 +1836,12 @@ class AgentSession:
         seen_tool_call_ids: set[str] = set()
         pending: dict[str, dict[str, Any]] = {}
         pending_interrupt: InterruptData | None = None
+        # Track usage from accumulated AIMessageChunks. `_drive_stream` may be called
+        # multiple times across HITL resumes; we accumulate across all of them so the
+        # final debit reflects total usage of the turn.
+        if not hasattr(self, "_last_usage_metadata"):
+            self._last_usage_metadata = None
+        accumulator: AIMessageChunk | None = None
 
         async for stream_mode, stream_data in stream_iter:
             if stream_mode == "interrupt":
@@ -1494,6 +1859,7 @@ class AgentSession:
             if stream_mode == "messages":
                 chunk, _metadata = stream_data
                 if isinstance(chunk, AIMessageChunk):
+                    accumulator = chunk if accumulator is None else accumulator + chunk
                     final_output += await self._stream_message_chunk(
                         chunk, seen_tool_call_ids
                     )
@@ -1502,6 +1868,8 @@ class AgentSession:
                     stream_data, seen_tool_call_ids, pending, collected_tool_calls
                 )
 
+        if accumulator is not None:
+            self._last_usage_metadata = getattr(accumulator, "usage_metadata", None)
         return final_output, pending_interrupt
 
     async def _stream_message_chunk(

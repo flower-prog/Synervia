@@ -116,9 +116,19 @@ class CrewEventQueueListener:
 
         def on_crew_completed(source, event: CrewKickoffCompletedEvent):
             output = getattr(event, "output", None)
+            metrics = getattr(source, "usage_metrics", None)
+            usage_payload = None
+            if metrics is not None:
+                usage_payload = {
+                    "prompt_tokens": int(getattr(metrics, "prompt_tokens", 0) or 0),
+                    "completion_tokens": int(getattr(metrics, "completion_tokens", 0) or 0),
+                    "cached_prompt_tokens": int(getattr(metrics, "cached_prompt_tokens", 0) or 0),
+                    "total_tokens": int(getattr(metrics, "total_tokens", 0) or 0),
+                }
             self._event_queue.put({
                 "type": "crew_complete",
                 "result": str(output.raw if hasattr(output, "raw") else output) if output else "",
+                "usage": usage_payload,
             })
 
         def on_crew_failed(source, event: CrewKickoffFailedEvent):

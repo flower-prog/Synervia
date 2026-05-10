@@ -37,6 +37,7 @@ from app.services.agent import (
     send_event,
 )
 from app.services.file_storage import get_file_storage
+from app.services.usage import UsageService
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +161,15 @@ class AgentSession:
                     collected_tool_calls,
                 )
 
+            # Record usage + debit credits (best-effort — never breaks the chat
+            # response if billing has a hiccup).
+            if agent_run.result is not None and organization_id:
+                await self._record_usage(
+                    agent_run=agent_run,
+                    assistant=assistant,
+                    organization_id=organization_id,
+                )
+
             if assistant_msg_id:
                 await send_event(
                     self.websocket,
@@ -180,6 +190,62 @@ class AgentSession:
         except Exception as e:
             logger.exception(f"Error processing agent request: {e}")
             await send_event(self.websocket, "error", {"message": str(e)})
+
+    async def _record_usage(
+        self,
+        *,
+        agent_run: Any,
+        assistant: Any,
+        organization_id: Any,
+    ) -> None:
+        """Persist a UsageEvent + debit credits for the just-finished agent run."""
+        try:
+            usage = agent_run.usage()
+        except Exception:
+            logger.exception("usage_extract_failed")
+            return
+
+        input_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+        cached_tokens = int(getattr(usage, "cache_read_tokens", 0) or 0)
+        if input_tokens == 0 and output_tokens == 0:
+            return
+
+        from uuid import UUID
+
+        try:
+            org_uuid = (
+                organization_id
+                if isinstance(organization_id, UUID)
+                else UUID(str(organization_id))
+            )
+        except Exception:
+            logger.warning("usage_record_skipped_invalid_org_id", extra={"org": organization_id})
+            return
+
+        conv_uuid: UUID | None = None
+        if self.current_conversation_id:
+            try:
+                conv_uuid = UUID(self.current_conversation_id)
+            except Exception:
+                conv_uuid = None
+
+        try:
+            async with get_db_context() as db:
+                svc = UsageService(db)
+                await svc.record(
+                    organization_id=org_uuid,
+                    actor_user_id=self.user.id,
+                    conversation_id=conv_uuid,
+                    model=getattr(assistant, "model_name", "") or "",
+                    provider="openai",
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    cached_tokens=cached_tokens,
+                    ai_framework="pydantic_ai",
+                )
+        except Exception:
+            logger.exception("usage_record_failed", extra={"org_id": str(org_uuid)})
 
     async def _build_multimodal_input(
         self, user_message: str, file_ids: list[Any]
