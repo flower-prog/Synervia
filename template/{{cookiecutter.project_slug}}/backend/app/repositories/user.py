@@ -35,6 +35,16 @@ async def get_by_oauth(db: AsyncSession, provider: str, oauth_id: str) -> User |
     )
     return result.scalar_one_or_none()
 {%- endif %}
+{%- if cookiecutter.use_delegated_auth %}
+
+
+async def get_by_external_user_id(db: AsyncSession, external_user_id: str) -> User | None:
+    """Get user by IdP-minted external ID (the JWT ``sub`` claim)."""
+    result = await db.execute(
+        select(User).where(User.external_user_id == external_user_id)
+    )
+    return result.scalar_one_or_none()
+{%- endif %}
 
 
 async def get_multi(
@@ -66,6 +76,9 @@ async def create(
     oauth_provider: str | None = None,
     oauth_id: str | None = None,
 {%- endif %}
+{%- if cookiecutter.use_delegated_auth %}
+    external_user_id: str | None = None,
+{%- endif %}
 ) -> User:
     """Create a new user.
 
@@ -81,6 +94,9 @@ async def create(
 {%- if cookiecutter.enable_oauth %}
         oauth_provider=oauth_provider,
         oauth_id=oauth_id,
+{%- endif %}
+{%- if cookiecutter.use_delegated_auth %}
+        external_user_id=external_user_id,
 {%- endif %}
     )
     db.add(user)

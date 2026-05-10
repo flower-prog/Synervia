@@ -157,6 +157,39 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = "http://localhost:{{ cookiecutter.backend_port }}/api/v1/oauth/google/callback"
 {%- endif %}
 
+{%- if cookiecutter.use_delegated_auth %}
+
+    # === Delegated auth (external token issuer) ===
+{%- if cookiecutter.use_shared_secret_jwt %}
+    # Shared-secret HS256 mode: client backend signs short-lived JWTs for our
+    # API using a pre-shared secret. Simpler than full IdP, suitable for
+    # tight client-server integrations. The secret MUST be high-entropy
+    # (32+ bytes recommended).
+    IDP_SHARED_SECRET: str = ""
+    """HMAC shared secret used to verify HS256 JWTs from the client."""
+    IDP_AUDIENCE: str = ""
+    """Optional `aud` claim check. Empty = skip audience verification."""
+    IDP_ISSUER: str = ""
+    """Optional `iss` claim check. Empty = skip issuer verification."""
+{%- else %}
+    # JWKS mode: backend trusts JWTs minted by Auth0/Clerk/Cognito/Keycloak/...
+    # All four below are REQUIRED in production — startup will fail without them.
+    IDP_JWKS_URL: str = ""
+    """Public JWKS endpoint, e.g. https://your-tenant.auth0.com/.well-known/jwks.json"""
+    IDP_AUDIENCE: str = ""
+    """Expected `aud` claim — the API identifier configured in your IdP."""
+    IDP_ISSUER: str = ""
+    """Expected `iss` claim — usually your IdP base URL with trailing slash."""
+    IDP_JWKS_CACHE_TTL_SECONDS: int = 3600
+    """How long to cache the JWKS response. Refresh on key rotation."""
+{%- endif %}
+    IDP_USER_ID_CLAIM: str = "sub"
+    """JWT claim used as stable external user ID. Standard is `sub`."""
+    IDP_EMAIL_CLAIM: str = "email"
+    """JWT claim used to populate User.email on first sign-in."""
+    IDP_NAME_CLAIM: str = "name"
+    """JWT claim used to populate User.full_name on first sign-in (optional)."""
+{%- endif %}
 {%- if cookiecutter.use_api_key %}
 
     # === Auth (API Key) ===
@@ -234,6 +267,10 @@ class Settings(BaseSettings):
     # === Prometheus ===
     PROMETHEUS_METRICS_PATH: str = "/metrics"
     PROMETHEUS_INCLUDE_IN_SCHEMA: bool = False
+    # When set, /metrics requires `Authorization: Bearer <token>`. Leave empty
+    # to expose unauthenticated (recommended only behind a private network or
+    # a reverse-proxy-level allow-list — Prometheus scrapes internally).
+    PROMETHEUS_AUTH_TOKEN: str = ""
 {%- endif %}
 
 {%- if cookiecutter.enable_file_storage %}

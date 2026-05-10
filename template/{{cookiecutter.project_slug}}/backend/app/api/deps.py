@@ -365,6 +365,43 @@ from app.db.models.user import User, UserRole
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 {%- if cookiecutter.use_postgresql %}
+{%- if cookiecutter.use_delegated_auth %}
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    user_service: UserSvc,
+) -> User:
+    """Resolve the current user from an IdP-issued JWT (delegated mode).
+
+    Validates the token signature against the IdP's published JWKS, then
+    looks up the local User row by ``external_user_id`` (= IdP ``sub``
+    claim). On the very first request from a fresh IdP user, auto-provisions
+    a User row with email + name pulled from the token claims.
+
+    Raises:
+        AuthenticationError: invalid/expired token, or user disabled locally.
+    """
+    from app.core.security import verify_idp_token
+
+    payload = verify_idp_token(token)
+    if payload is None:
+        raise AuthenticationError(message="Invalid or expired token")
+
+    external_id = payload.get(settings.IDP_USER_ID_CLAIM)
+    if not external_id:
+        raise AuthenticationError(
+            message=f"Token missing required claim: {settings.IDP_USER_ID_CLAIM}"
+        )
+
+    user = await user_service.get_or_create_from_idp(
+        external_user_id=str(external_id),
+        email=payload.get(settings.IDP_EMAIL_CLAIM) or f"{external_id}@idp.local",
+        full_name=payload.get(settings.IDP_NAME_CLAIM),
+    )
+    if not user.is_active:
+        raise AuthenticationError(message="User account is disabled")
+
+    return user
+{%- else %}
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     user_service: UserSvc,
@@ -397,6 +434,7 @@ async def get_current_user(
         raise AuthenticationError(message="User account is disabled")
 
     return user
+{%- endif %}
 
 
 class RoleChecker:
@@ -1074,7 +1112,7 @@ def get_contact_service() -> ContactService:
 
 ContactSvc = Annotated[ContactService, Depends(get_contact_service)]
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 from app.services.user_slash_command import UserSlashCommandService
 
 

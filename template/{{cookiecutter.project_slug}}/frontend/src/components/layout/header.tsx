@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/hooks";
 import { Button } from "@/components/ui";
 import { ThemeToggle } from "@/components/theme";
+{%- if cookiecutter.enable_i18n %}
 import { LanguageSwitcherCompact } from "@/components/language-switcher";
+{%- endif %}
 import { APP_NAME, ROUTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -95,7 +97,9 @@ export function Header() {
 {%- if cookiecutter.enable_teams %}
           {isAuthenticated && <OrgSwitcher />}
 {%- endif %}
+{%- if cookiecutter.enable_i18n %}
           <LanguageSwitcherCompact />
+{%- endif %}
           <ThemeToggle />
           {isAuthenticated ? (
             <>

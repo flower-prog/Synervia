@@ -348,6 +348,9 @@ class ConversationService:
 {%- if cookiecutter.use_jwt %}
             user_id=data.user_id,
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+            external_user_id=getattr(data, "external_user_id", None),
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
             project_id=data.project_id,
 {%- endif %}
@@ -377,6 +380,8 @@ class ConversationService:
 {%- endif %}
         )
         update_data = data.model_dump(exclude_unset=True)
+        if "active_knowledge_base_ids" in update_data and update_data["active_knowledge_base_ids"] is not None:
+            update_data["active_knowledge_base_ids"] = [str(kb_id) for kb_id in update_data["active_knowledge_base_ids"]]
         return await conversation_repo.update_conversation(
             self.db, db_conversation=conversation, update_data=update_data
         )
@@ -1015,6 +1020,10 @@ class ConversationService:
 {%- endif %}
         )
         update_data = data.model_dump(exclude_unset=True)
+        if "active_knowledge_base_ids" in update_data:
+            import json
+            ids = update_data["active_knowledge_base_ids"]
+            update_data["active_knowledge_base_ids"] = json.dumps([str(kb_id) for kb_id in ids]) if ids is not None else None
         return conversation_repo.update_conversation(
             self.db, db_conversation=conversation, update_data=update_data
         )
@@ -1526,6 +1535,8 @@ class ConversationService:
 {%- endif %}
         )
         update_data = data.model_dump(exclude_unset=True)
+        if "active_knowledge_base_ids" in update_data and update_data["active_knowledge_base_ids"] is not None:
+            update_data["active_knowledge_base_ids"] = [str(kb_id) for kb_id in update_data["active_knowledge_base_ids"]]
         return await conversation_repo.update_conversation(
             db_conversation=conversation, update_data=update_data
         )

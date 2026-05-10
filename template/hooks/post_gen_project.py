@@ -58,6 +58,12 @@ enable_email = "{{ cookiecutter.enable_email }}" == "True"
 enable_newsletter_signup = "{{ cookiecutter.enable_newsletter_signup }}" == "True"
 enable_marketing_site = "{{ cookiecutter.enable_marketing_site }}" == "True"
 enable_changelog = "{{ cookiecutter.enable_changelog }}" == "True"
+enable_i18n = "{{ cookiecutter.enable_i18n }}" == "True"
+use_delegated_auth = "{{ cookiecutter.use_delegated_auth }}" == "True"
+use_external_user_id_in_conversations = (
+    "{{ cookiecutter.use_external_user_id_in_conversations }}" == "True"
+)
+include_example_crud = "{{ cookiecutter.include_example_crud }}" == "True"
 
 
 def remove_file(path: str) -> None:
@@ -867,5 +873,78 @@ if not enable_changelog and use_frontend:
     frontend_src = os.path.join(frontend_root, "src")
     remove_dir(os.path.join(frontend_src, "app", "[locale]", "changelog"))
     remove_file(os.path.join(frontend_src, "lib", "changelog.ts"))
+
+# Delegated auth: external IdP issues JWTs. Strip the local password/email
+# auth surface — register, password reset, magic link have no meaning when
+# the IdP owns the user identity.
+if use_delegated_auth:
+    backend_root = os.path.join(os.getcwd(), "backend")
+    backend_app = os.path.join(backend_root, "app")
+    # Email-based auth recovery flows are dead in delegated mode.
+    remove_file(os.path.join(backend_app, "schemas", "password_reset.py"))
+    remove_file(os.path.join(backend_app, "schemas", "magic_link.py"))
+    if use_frontend:
+        frontend_root = os.path.join(os.getcwd(), "frontend")
+        frontend_src = os.path.join(frontend_root, "src")
+        # Public auth pages — IdP owns these UIs now.
+        for d in ("login", "register", "forgot-password", "reset-password", "magic-link-sent"):
+            remove_dir(os.path.join(frontend_src, "app", "[locale]", "(auth)", d))
+        for f in ("login-form.tsx", "register-form.tsx", "forgot-password-form.tsx", "reset-password-form.tsx"):
+            remove_file(os.path.join(frontend_src, "components", "auth", f))
+
+else:
+    # Local-auth mode: the delegated-auth migration is dead weight.
+    backend_root = os.path.join(os.getcwd(), "backend")
+    remove_file(
+        os.path.join(backend_root, "alembic", "versions", "0019_user_external_id.py")
+    )
+
+# Example Item CRUD scaffold — remove all 6 files when not requested.
+if not include_example_crud:
+    backend_root = os.path.join(os.getcwd(), "backend")
+    remove_file(os.path.join(backend_app, "db", "models", "item.py"))
+    remove_file(os.path.join(backend_app, "schemas", "item.py"))
+    remove_file(os.path.join(backend_app, "repositories", "item.py"))
+    remove_file(os.path.join(backend_app, "services", "item.py"))
+    remove_file(os.path.join(backend_app, "api", "routes", "v1", "items.py"))
+    remove_file(
+        os.path.join(backend_root, "alembic", "versions", "0021_create_items.py")
+    )
+
+# Conversations.external_user_id is opt-in even within delegated mode.
+if not use_external_user_id_in_conversations:
+    backend_root = os.path.join(os.getcwd(), "backend")
+    remove_file(
+        os.path.join(
+            backend_root,
+            "alembic",
+            "versions",
+            "0020_conversation_external_user_id.py",
+        )
+    )
+
+# i18n: when single-locale (English-only), drop:
+#   - Polish translations (`messages/pl.json`)
+#   - Per-locale Polish legal/marketing TSX (e.g. `legal/pl/*`)
+#   - Language switcher component (no longer rendered by header.tsx, so the
+#     file is dead code — strip to keep `bun build` lean).
+# The next-intl provider stays — it still works with one locale and any
+# `useTranslations()` call keeps reading from `messages/en.json`. Re-enabling
+# multi-language later means putting the files back + extending `i18n.ts`.
+if not enable_i18n and use_frontend:
+    frontend_root = os.path.join(os.getcwd(), "frontend")
+    frontend_src = os.path.join(frontend_root, "src")
+    remove_file(os.path.join(frontend_root, "messages", "pl.json"))
+    remove_file(os.path.join(frontend_src, "components", "language-switcher.tsx"))
+    # Per-locale Polish copies — the en/ counterparts stay.
+    legal_dir = os.path.join(frontend_src, "components", "legal")
+    if os.path.isdir(legal_dir):
+        for entry in os.listdir(legal_dir):
+            if entry.startswith("pl") or entry.endswith("-pl.tsx"):
+                target = os.path.join(legal_dir, entry)
+                if os.path.isfile(target):
+                    remove_file(target)
+                elif os.path.isdir(target):
+                    remove_dir(target)
 
 print("Project generated successfully!")

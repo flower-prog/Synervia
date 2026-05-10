@@ -8,6 +8,95 @@ import jwt
 
 from app.core.config import settings
 
+{%- if cookiecutter.use_delegated_auth %}
+
+# === Delegated-auth verifier ===
+# Validates JWTs minted by an external system. Two modes (chosen at template
+# generation time): JWKS (RS/ES asymmetric, IdP-style) or shared-secret HS256.
+# Both expose the same `verify_idp_token(token)` API so the rest of the app
+# doesn't care which is in use.
+
+{%- if cookiecutter.use_shared_secret_jwt %}
+
+
+def verify_idp_token(token: str) -> dict[str, Any] | None:
+    """Validate a JWT signed with the pre-shared HS256 secret.
+
+    Use this when the client backend signs short-lived JWTs for our API with
+    a known secret rather than going through a full IdP. The secret lives in
+    ``settings.IDP_SHARED_SECRET`` and MUST be high-entropy (rotate it on
+    suspected leak; rotation invalidates all in-flight tokens).
+
+    Returns claims dict on success, ``None`` on any verification failure.
+    """
+    if not settings.IDP_SHARED_SECRET:
+        return None
+    try:
+        return jwt.decode(
+            token,
+            settings.IDP_SHARED_SECRET,
+            algorithms=["HS256"],
+            audience=settings.IDP_AUDIENCE or None,
+            issuer=settings.IDP_ISSUER or None,
+            leeway=30,
+            # `aud` and `iss` checks skipped when the corresponding setting
+            # is empty (otherwise PyJWT raises MissingRequiredClaimError).
+            options={
+                "verify_aud": bool(settings.IDP_AUDIENCE),
+                "verify_iss": bool(settings.IDP_ISSUER),
+            },
+        )
+    except jwt.PyJWTError:
+        return None
+{%- else %}
+
+_jwks_client: jwt.PyJWKClient | None = None
+
+
+def _get_jwks_client() -> jwt.PyJWKClient:
+    """Lazy singleton — only built when first delegated request hits."""
+    global _jwks_client
+    if _jwks_client is None:
+        if not settings.IDP_JWKS_URL:
+            raise RuntimeError(
+                "IDP_JWKS_URL is not set — delegated auth cannot validate tokens."
+            )
+        _jwks_client = jwt.PyJWKClient(
+            settings.IDP_JWKS_URL,
+            cache_keys=True,
+            lifespan=settings.IDP_JWKS_CACHE_TTL_SECONDS,
+        )
+    return _jwks_client
+
+
+def verify_idp_token(token: str) -> dict[str, Any] | None:
+    """Validate a JWT issued by the configured IdP.
+
+    Returns the decoded claims dict on success, or ``None`` if any check fails
+    (signature, audience, issuer, expiry). Caller decides how to translate
+    ``None`` into HTTP 401.
+
+    Notes:
+    - Algorithms: any RS256/ES256/etc. published in the JWKS. ``HS256``
+      explicitly rejected — use --shared-secret-jwt for HMAC tokens instead.
+    - Clock skew: 30 seconds via ``leeway``.
+    """
+    try:
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "ES256", "RS384", "ES384", "RS512", "ES512"],
+            audience=settings.IDP_AUDIENCE or None,
+            issuer=settings.IDP_ISSUER or None,
+            leeway=30,
+        )
+    except (jwt.PyJWTError, jwt.exceptions.PyJWKClientError):
+        return None
+{%- endif %}
+{%- endif %}
+
 
 def create_access_token(
     subject: str | Any,

@@ -55,7 +55,7 @@ from app.db.models.audit_log import AppAdminAuditLog
 {%- set _ = models.append("KnowledgeBase") %}
 from app.db.models.knowledge_base import KnowledgeBase
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 {%- set _ = models.append("UserSlashCommand") %}
 from app.db.models.user_slash_command import UserSlashCommand
 {%- endif %}

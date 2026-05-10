@@ -180,6 +180,13 @@ class ConversationCreate(ConversationBase):
     user_id: str | None = Field(default=None, description="Owner user ID")
 {%- endif %}
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+    external_user_id: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Denormalized IdP `sub` for client-side lookup",
+    )
+{%- endif %}
 {%- if cookiecutter.use_pydantic_deep and cookiecutter.use_jwt %}
 {%- if cookiecutter.use_postgresql %}
     project_id: UUID | None = Field(default=None, description="Project this conversation belongs to")

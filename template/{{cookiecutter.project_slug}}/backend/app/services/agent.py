@@ -190,6 +190,9 @@ async def persist_user_turn(
 {%- if cookiecutter.websocket_auth_jwt %}
                         user_id=user.id,
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations and cookiecutter.websocket_auth_jwt %}
+                        external_user_id=getattr(user, "external_user_id", None),
+{%- endif %}
 {%- if cookiecutter.enable_teams and cookiecutter.websocket_auth_jwt %}
                         organization_id=personal_org.id if personal_org else None,
 {%- endif %}

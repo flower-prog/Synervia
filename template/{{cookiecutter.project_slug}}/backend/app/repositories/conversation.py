@@ -241,6 +241,9 @@ async def create_conversation(
 {%- if cookiecutter.use_jwt %}
     user_id: UUID | None = None,
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+    external_user_id: str | None = None,
+{%- endif %}
 {%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
     organization_id: UUID | None = None,
 {%- endif %}
@@ -254,6 +257,9 @@ async def create_conversation(
 {%- if cookiecutter.use_jwt %}
         user_id=user_id,
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+        external_user_id=external_user_id,
+{%- endif %}
 {%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
         organization_id=organization_id,
 {%- endif %}
@@ -266,6 +272,35 @@ async def create_conversation(
     await db.flush()
     await db.refresh(conversation)
     return conversation
+
+
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+
+
+async def list_conversations_by_external_user_id(
+    db: AsyncSession,
+    external_user_id: str,
+    *,
+    skip: int = 0,
+    limit: int = 50,
+    include_archived: bool = False,
+) -> list[Conversation]:
+    """Fetch conversations by client-known IdP `sub` (delegated mode).
+
+    Lets the client list a user's chats without ever knowing the internal
+    User UUID. No FK join — direct index scan on the denormalized column.
+    """
+    query = select(Conversation).where(Conversation.external_user_id == external_user_id)
+    if not include_archived:
+        query = query.where(Conversation.is_archived == False)  # noqa: E712
+    query = (
+        query.order_by(Conversation.updated_at.desc().nullslast(), Conversation.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return list(result.scalars().all())
+{%- endif %}
 
 
 async def update_conversation(

@@ -60,7 +60,14 @@ dependencies = [
     "alembic>=1.18.0",
 {%- endif %}
 {%- if cookiecutter.use_jwt %}
+{%- if cookiecutter.use_jwks_idp %}
+    # PyJWT[crypto] pulls in `cryptography` for RSA/ECDSA verification — needed
+    # to validate IdP-issued tokens against a published JWKS.
+    "pyjwt[crypto]>=2.9.0",
+{%- else %}
+    # HMAC HS256 only — no asymmetric keys, no `cryptography` extra.
     "pyjwt>=2.9.0",
+{%- endif %}
     "bcrypt>=4.0.0",
     "python-multipart>=0.0.12",
 {%- endif %}

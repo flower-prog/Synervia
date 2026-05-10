@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+{%- if cookiecutter.enable_i18n %}
 import { LanguageSwitcherCompact } from "@/components/language-switcher";
+{%- endif %}
 import { cn } from "@/lib/utils";
 
 interface NavLink {
@@ -58,9 +60,11 @@ export function PillNav({ brand, links, ctaLabel, ctaHref, secondaryCta }: PillN
       </nav>
 
       <div className="flex items-center gap-2">
+{%- if cookiecutter.enable_i18n %}
         <div className="hidden md:block">
           <LanguageSwitcherCompact />
         </div>
+{%- endif %}
         {secondaryCta && (
           <Link
             href={secondaryCta.href}

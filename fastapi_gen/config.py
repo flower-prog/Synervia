@@ -68,6 +68,22 @@ class OAuthProvider(StrEnum):
     GOOGLE = "google"
 
 
+class AuthMode(StrEnum):
+    """High-level authentication strategy.
+
+    - ``local``: backend issues + validates its own JWTs via email/password +
+      optional OAuth. Owns user storage including hashed passwords.
+    - ``delegated``: backend trusts JWTs issued by an external IdP (Auth0,
+      Clerk, Cognito, Keycloak, ...). Validates them against a public JWKS URL.
+      No registration UI, no password storage, no email-based recovery flows.
+      First request from an unknown user auto-provisions a row keyed by
+      ``external_user_id`` (the IdP ``sub`` claim).
+    """
+
+    LOCAL = "local"
+    DELEGATED = "delegated"
+
+
 class AIFrameworkType(StrEnum):
     """Supported AI agent frameworks."""
 
@@ -229,6 +245,16 @@ class ProjectConfig(BaseModel):
 
     # Authentication (always JWT + API Key)
     oauth_provider: OAuthProvider = OAuthProvider.NONE
+    auth_mode: AuthMode = AuthMode.LOCAL
+    # When auth_mode=delegated: use a shared HMAC secret instead of fetching
+    # public keys from a JWKS URL. Simpler integration when client backend
+    # signs short-lived tokens for our backend with a known secret. Default
+    # (False) uses RSA/ES via JWKS — the IdP-friendly path.
+    delegated_auth_use_shared_secret: bool = False
+    # When auth_mode=delegated: denormalize the IdP `sub` claim onto
+    # Conversation rows so client APIs can fetch conversations by THEIR
+    # user identifier without leaking internal UUIDs.
+    enable_external_user_id_in_conversations: bool = False
     enable_session_management: bool = False
 
     # Observability
@@ -313,6 +339,8 @@ class ProjectConfig(BaseModel):
 
     # Marketing / Frontend pages
     enable_marketing_site: bool = False
+    enable_i18n: bool = True
+    include_example_crud: bool = False
     enable_changelog: bool = False
     enable_testimonials: bool = False
     enable_comparison_pages: bool = False
@@ -477,6 +505,90 @@ class ProjectConfig(BaseModel):
                 f"RAG with {self.rag_features.vector_store.value} requires Docker to be enabled."
             )
 
+        # RAG sub-features require RAG itself
+        if self.rag_features.enable_google_drive_ingestion and not self.rag_features.enable_rag:
+            raise ValueError(
+                "Google Drive ingestion requires RAG to be enabled. "
+                "Quick fix: add --rag, or remove --gdrive-rag."
+            )
+        if self.rag_features.enable_s3_ingestion and not self.rag_features.enable_rag:
+            raise ValueError(
+                "S3/MinIO ingestion requires RAG to be enabled. "
+                "Quick fix: add --rag, or remove --s3-rag."
+            )
+        if (
+            self.rag_features.reranker_type != RerankerType.NONE
+            and not self.rag_features.enable_rag
+        ):
+            raise ValueError(
+                "Reranker requires RAG to be enabled. "
+                "Quick fix: add --rag, or set --reranker none."
+            )
+        if self.rag_features.enable_image_description and not self.rag_features.enable_rag:
+            raise ValueError(
+                "RAG image description requires RAG to be enabled. "
+                "Quick fix: add --rag."
+            )
+
+        # Frontend-dependent surfaces
+        if self.enable_marketing_site and self.frontend == FrontendType.NONE:
+            raise ValueError(
+                "Marketing site requires a frontend (landing/blog/legal pages need a UI). "
+                "Quick fix: add --frontend nextjs, or drop --marketing-site."
+            )
+        if self.oauth_provider != OAuthProvider.NONE and self.frontend == FrontendType.NONE:
+            raise ValueError(
+                "OAuth requires a frontend for the callback page. "
+                "Quick fix: add --frontend nextjs, or set --oauth-provider none."
+            )
+
+        # Kubernetes implies Docker
+        if self.enable_kubernetes and not self.enable_docker:
+            raise ValueError(
+                "Kubernetes manifests reference the Docker image — Docker must be enabled. "
+                "Quick fix: drop --no-docker, or remove --kubernetes."
+            )
+
+        # Delegated auth supersedes local-auth options. Loud-fail any combo
+        # that's a footgun rather than silently dropping user choices.
+        if self.auth_mode == AuthMode.DELEGATED:
+            if self.oauth_provider != OAuthProvider.NONE:
+                raise ValueError(
+                    "--auth-mode=delegated handles OAuth via the external IdP. "
+                    "Quick fix: drop --oauth-google (your IdP will handle social login)."
+                )
+            if self.enable_session_management:
+                raise ValueError(
+                    "--auth-mode=delegated invalidates by IdP token expiry; the local "
+                    "session table is unused. Quick fix: drop --session-management."
+                )
+
+        # Example CRUD scaffold needs the SQL stack — Items belong to a User
+        if self.include_example_crud and self.database not in (
+            DatabaseType.POSTGRESQL,
+            DatabaseType.SQLITE,
+        ):
+            raise ValueError(
+                "--example-resource scaffold supports PostgreSQL/SQLite only today. "
+                "Quick fix: switch to --database postgresql or drop --example-resource."
+            )
+
+        # Sub-flags that only make sense in delegated mode
+        if self.delegated_auth_use_shared_secret and self.auth_mode != AuthMode.DELEGATED:
+            raise ValueError(
+                "--shared-secret-jwt only applies when --auth-mode=delegated. "
+                "Quick fix: add --auth-mode delegated, or drop --shared-secret-jwt."
+            )
+        if (
+            self.enable_external_user_id_in_conversations
+            and self.auth_mode != AuthMode.DELEGATED
+        ):
+            raise ValueError(
+                "--external-user-id is meaningful only with --auth-mode=delegated "
+                "(it denormalizes the IdP `sub` claim onto conversations). "
+                "Quick fix: add --auth-mode delegated, or drop --external-user-id."
+            )
+
         return self
 
     def to_cookiecutter_context(self) -> dict[str, Any]:
@@ -515,6 +627,20 @@ class ProjectConfig(BaseModel):
             "oauth_provider": self.oauth_provider.value,
             "enable_oauth": self.oauth_provider != OAuthProvider.NONE,
             "enable_oauth_google": self.oauth_provider == OAuthProvider.GOOGLE,
+            # Auth mode (local password+OAuth vs delegated/IdP)
+            "auth_mode": self.auth_mode.value,
+            "use_local_auth": self.auth_mode == AuthMode.LOCAL,
+            "use_delegated_auth": self.auth_mode == AuthMode.DELEGATED,
+            "use_shared_secret_jwt": (
+                self.auth_mode == AuthMode.DELEGATED and self.delegated_auth_use_shared_secret
+            ),
+            "use_jwks_idp": (
+                self.auth_mode == AuthMode.DELEGATED and not self.delegated_auth_use_shared_secret
+            ),
+            "use_external_user_id_in_conversations": (
+                self.auth_mode == AuthMode.DELEGATED
+                and self.enable_external_user_id_in_conversations
+            ),
             # Session Management
             "enable_session_management": self.enable_session_management,
             # Logfire
@@ -582,10 +708,10 @@ class ProjectConfig(BaseModel):
             "websocket_auth_api_key": False,
             "websocket_auth_none": False,
             "enable_cors": self.enable_cors,
-            # Frontend features (always enabled)
-            "enable_i18n": True,
-            # Example CRUD (always disabled)
-            "include_example_crud": False,
+            # Frontend features
+            "enable_i18n": self.enable_i18n,
+            # Example CRUD scaffold (Items resource — pattern reference for new domains)
+            "include_example_crud": self.include_example_crud,
             # Dev tools
             "enable_pytest": self.enable_pytest,
             "enable_precommit": self.enable_precommit,

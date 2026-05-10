@@ -59,8 +59,11 @@ from app.api.routes.v1 import marketing
 {%- if cookiecutter.enable_marketing_site %}
 from app.api.routes.v1 import contact
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 from app.api.routes.v1 import me_slash_commands
+{%- endif %}
+{%- if cookiecutter.include_example_crud and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+from app.api.routes.v1 import items
 {%- endif %}
 from app.api.routes.v1 import admin_stats
 
@@ -184,9 +187,15 @@ v1_router.include_router(marketing.router, tags=["marketing"])
 {%- if cookiecutter.enable_marketing_site %}
 v1_router.include_router(contact.router, tags=["contact"])
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 v1_router.include_router(
     me_slash_commands.router, prefix="/me/slash-commands", tags=["me:slash-commands"]
 )
 {%- endif %}
 v1_router.include_router(admin_stats.router, prefix="/admin", tags=["admin:stats"])
+
+{%- if cookiecutter.include_example_crud and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
+
+# Example Item CRUD (reference scaffold — safe to delete once you've added your own domain)
+v1_router.include_router(items.router, prefix="/items", tags=["items"])
+{%- endif %}

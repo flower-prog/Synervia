@@ -583,7 +583,7 @@ class TestCreateCommand:
         """Test create with Google OAuth."""
         mock_generate.return_value = tmp_path / "myproject"
 
-        result = runner.invoke(create, ["myproject", "--oauth-google"])
+        result = runner.invoke(create, ["myproject", "--oauth-google", "--frontend", "nextjs"])
 
         assert result.exit_code == 0
         config = mock_generate.call_args[0][0]

@@ -170,9 +170,7 @@ class UserService:
             hashed_password=hashed_password,
             full_name=user_in.full_name,
             role=UserRole.ADMIN.value if is_first_user else user_in.role.value,
-{%- if cookiecutter.enable_admin_panel %}
             is_app_admin=is_first_user,
-{%- endif %}
         )
 {%- if cookiecutter.enable_teams %}
         org_service = OrganizationService(self.db)
@@ -193,6 +191,57 @@ class UserService:
 
 {%- if cookiecutter.enable_oauth %}
 
+{%- if cookiecutter.use_delegated_auth %}
+    async def get_or_create_from_idp(
+        self,
+        *,
+        external_user_id: str,
+        email: str,
+        full_name: str | None = None,
+    ) -> User:
+        """Auto-provision a local row for a delegated-auth IdP user.
+
+        Lookup order:
+        1. ``external_user_id`` (stable, IdP-issued) — fast path on every
+           subsequent request.
+        2. ``email`` — for users that pre-existed in the local DB before
+           switching to delegated auth (e.g., migrated SaaS).
+        3. Create new row + personal org + welcome email (best-effort).
+        """
+        existing = await user_repo.get_by_external_user_id(self.db, external_user_id)
+        if existing:
+            return existing
+
+        by_email = await user_repo.get_by_email(self.db, email)
+        if by_email is not None:
+            await user_repo.update(
+                self.db,
+                db_user=by_email,
+                update_data={"external_user_id": external_user_id},
+            )
+            return by_email
+
+        existing_count = (
+            await self.db.execute(select(func.count()).select_from(User))
+        ).scalar_one()
+        is_first_user = existing_count == 0
+
+        user = await user_repo.create(
+            self.db,
+            email=email,
+            hashed_password=None,
+            full_name=full_name,
+            external_user_id=external_user_id,
+            role=UserRole.ADMIN.value if is_first_user else UserRole.USER.value,
+            is_app_admin=is_first_user,
+        )
+{%- if cookiecutter.enable_teams %}
+        org_service = OrganizationService(self.db)
+        await org_service.create_personal_org(user.id, user.email)
+{%- endif %}
+        return user
+
+{%- endif %}
     async def get_or_create_oauth_user(
         self,
         *,

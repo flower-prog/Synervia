@@ -50,7 +50,7 @@ from app.repositories import invitation as invitation_repo
 from app.repositories import member as member_repo
 from app.repositories import organization as organization_repo
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
 
 from app.repositories import user_slash_command as user_slash_command_repo
 {%- endif %}
@@ -94,7 +94,7 @@ __all__ = [
     "member_repo",
     "invitation_repo",
 {%- endif %}
-{%- if cookiecutter.use_auth %}
+{%- if cookiecutter.use_auth and (cookiecutter.use_postgresql or cookiecutter.use_sqlite) %}
     "user_slash_command_repo",
 {%- endif %}
 ]

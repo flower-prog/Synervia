@@ -8,6 +8,7 @@ from rich.console import Console
 from . import __version__
 from .config import (
     AIFrameworkType,
+    AuthMode,
     BackgroundTaskType,
     BrandColorType,
     CIType,
@@ -21,12 +22,201 @@ from .config import (
     ProjectConfig,
     RAGFeatures,
     RerankerType,
+    ReverseProxyType,
     VectorStoreType,
 )
 from .generator import generate_project, post_generation_tasks
 from .prompts import confirm_generation, run_interactive_prompts, show_summary
 
 console = Console()
+
+
+def _preflight_check(  # noqa: C901
+    *,
+    billing: bool,
+    credits: bool,
+    teams: bool,
+    usage_dashboard: bool,
+    anomaly_detection: bool,
+    slack_alerts: bool,
+    newsletter: bool,
+    email: bool,
+    rag: bool,
+    database: str,
+    vector_store: str,
+    frontend: str,
+    admin_panel: bool,
+    marketing_site: bool,
+    oauth_google: bool,
+    gdrive_rag: bool,
+    s3_rag: bool,
+    task_queue: str,
+    redis: bool,
+    caching: bool,
+    rate_limiting: bool,
+    llm_provider: str,
+) -> None:
+    """Catch common flag conflicts BEFORE ProjectConfig validation.
+
+    Pydantic raises one error at a time after parsing finishes. This pre-flight
+    collects ALL conflicts and shows them with "Quick fix" hints, so users can
+    correct everything in one go. Pydantic validators stay as the source of
+    truth for programmatic use; this is purely UX polish.
+    """
+    issues: list[tuple[str, str]] = []  # (problem, quick_fix)
+
+    # --- Teams / billing dependency chain ---
+    if billing and not teams:
+        issues.append(
+            (
+                "--billing requires --teams (Stripe subscriptions are scoped to organizations)",
+                "Add --teams or remove --billing",
+            )
+        )
+    if credits and not billing:
+        issues.append(
+            (
+                "--credits requires --billing (credits are tied to Stripe pricing)",
+                "Add --billing --teams (or drop --credits)",
+            )
+        )
+    if usage_dashboard and not credits:
+        issues.append(
+            (
+                "--usage-dashboard requires --credits (it visualises credit consumption)",
+                "Add --credits --billing --teams",
+            )
+        )
+    if anomaly_detection and not credits:
+        issues.append(
+            (
+                "--anomaly-detection requires --credits (it flags credit-spend anomalies)",
+                "Add --credits --billing --teams",
+            )
+        )
+    if slack_alerts and not anomaly_detection:
+        issues.append(
+            (
+                "--slack-alerts requires --anomaly-detection (alerts ride on detected anomalies)",
+                "Add --anomaly-detection --credits --billing --teams",
+            )
+        )
+
+    # --- Email / newsletter ---
+    if newsletter and not email:
+        issues.append(
+            (
+                "--newsletter requires --email (signup confirmation needs a transactional sender)",
+                "Add --email or drop --newsletter",
+            )
+        )
+
+    # --- RAG dependency chain ---
+    if rag and database == "none":
+        issues.append(
+            (
+                "--rag requires a database (RAGDocument table stores per-doc metadata)",
+                "Pick --database postgresql|mongodb|sqlite",
+            )
+        )
+    if rag and vector_store == "pgvector" and database != "postgresql":
+        issues.append(
+            (
+                f"--vector-store=pgvector requires --database=postgresql, got {database}",
+                "Switch to --database postgresql or pick --vector-store milvus|qdrant|chromadb",
+            )
+        )
+    if gdrive_rag and not rag:
+        issues.append(
+            (
+                "--gdrive-rag requires --rag (Drive sync feeds the vector store)",
+                "Add --rag",
+            )
+        )
+    if s3_rag and not rag:
+        issues.append(
+            (
+                "--s3-rag requires --rag (S3 sync feeds the vector store)",
+                "Add --rag",
+            )
+        )
+
+    # --- Frontend-dependent features ---
+    if marketing_site and frontend == "none":
+        issues.append(
+            (
+                "--marketing-site requires --frontend nextjs (landing/blog/legal pages need a UI)",
+                "Add --frontend nextjs or drop --marketing-site",
+            )
+        )
+    if admin_panel and frontend == "none":
+        click.echo(
+            click.style(
+                "⚠ --admin-panel: SQLAdmin UI lives in the frontend. "
+                "Backend admin REST routes (/admin/users, /admin/conversations, etc.) "
+                "still work without it — add --frontend nextjs for the visual panel.",
+                fg="yellow",
+            ),
+            err=True,
+        )
+    if oauth_google and frontend == "none":
+        issues.append(
+            (
+                "--oauth-google needs the frontend callback page",
+                "Add --frontend nextjs or drop --oauth-google",
+            )
+        )
+
+    # --- Background queue / Redis ---
+    if task_queue in ("celery", "taskiq", "arq") and not redis:
+        issues.append(
+            (
+                f"--task-queue={task_queue} requires --redis (broker/result backend)",
+                f"Add --redis (it'll auto-enable for queue={task_queue})",
+            )
+        )
+    if caching and not redis:
+        issues.append(
+            (
+                "--caching requires --redis (cache backend)",
+                "Add --redis or drop --caching",
+            )
+        )
+
+    # --- Multi-LLM context ---
+    if llm_provider == "all" and frontend == "none":
+        # Not an error — just a warning. Skip for headless/API-only uses.
+        click.echo(
+            click.style(
+                "⚠ --llm-provider=all is most useful with the chat UI provider switcher; "
+                "without --frontend you'll need to pick the model server-side per-request.",
+                fg="yellow",
+            ),
+            err=True,
+        )
+
+    if not issues:
+        return
+
+    msg_lines = [
+        click.style(
+            f"✗ {len(issues)} conflicting flag combination{'s' if len(issues) > 1 else ''} found:",
+            fg="red",
+            bold=True,
+        ),
+        "",
+    ]
+    for i, (problem, fix) in enumerate(issues, 1):
+        msg_lines.append(click.style(f"  {i}. {problem}", fg="red"))
+        msg_lines.append(click.style(f"     Quick fix: {fix}", fg="yellow"))
+        msg_lines.append("")
+    msg_lines.append(
+        click.style(
+            "Run `fastapi-fullstack templates` to see preset shortcuts for common scenarios.",
+            fg="cyan",
+        )
+    )
+    raise click.UsageError("\n".join(msg_lines))
 
 
 @click.group(invoke_without_command=True)
@@ -208,13 +398,62 @@ def new(output: Path | None, no_input: bool, name: str | None, minimal: bool) ->
 @click.option("--rate-limiting", is_flag=True, help="Enable rate limiting")
 @click.option("--admin-panel", is_flag=True, help="Enable admin panel (SQLAdmin)")
 @click.option(
+    "--admin-features",
+    type=str,
+    default=None,
+    help=(
+        "Comma-separated list of admin panel sections to enable "
+        "(users,orgs,subs,usage,events,audit,health). "
+        "Defaults to all sections when --admin-panel is set."
+    ),
+)
+@click.option(
     "--task-queue",
     type=click.Choice(["none", "celery", "taskiq", "arq"]),
     default="none",
     help="Background task queue",
 )
 @click.option("--oauth-google", is_flag=True, help="Enable Google OAuth")
+@click.option(
+    "--auth-mode",
+    type=click.Choice(["local", "delegated"]),
+    default="local",
+    help=(
+        "local (default): backend handles email/password + optional OAuth. "
+        "delegated: backend trusts JWTs from external IdP (Auth0/Clerk/Cognito/Keycloak) "
+        "validated against a public JWKS URL. No registration UI, no password storage."
+    ),
+)
+@click.option(
+    "--shared-secret-jwt",
+    is_flag=True,
+    default=False,
+    help=(
+        "When --auth-mode=delegated: validate JWTs with a shared HMAC secret "
+        "(HS256) instead of fetching public keys from a JWKS URL. Use when the "
+        "client backend signs short-lived tokens for our API with a known secret."
+    ),
+)
+@click.option(
+    "--external-user-id",
+    is_flag=True,
+    default=False,
+    help=(
+        "When --auth-mode=delegated: denormalize the IdP `sub` onto Conversation "
+        "rows so client APIs can list conversations by their user identifier "
+        "without leaking internal UUIDs."
+    ),
+)
+@click.option("--websockets", is_flag=True, default=False, help="Enable WebSocket support (required for real-time AI chat)")
+@click.option("--web-search", is_flag=True, default=False, help="Enable web search tool for AI agents (Tavily)")
+@click.option("--web-fetch", is_flag=True, default=False, help="Enable web fetch/scraping tool for AI agents")
 @click.option("--session-management", is_flag=True, help="Enable session management")
+@click.option(
+    "--reverse-proxy",
+    type=click.Choice(["none", "nginx", "traefik"]),
+    default="nginx",
+    help="Reverse proxy configuration (default: nginx — external nginx, config template only)",
+)
 @click.option("--kubernetes", is_flag=True, help="Generate Kubernetes manifests")
 @click.option(
     "--ci",
@@ -239,9 +478,23 @@ def new(output: Path | None, no_input: bool, name: str | None, minimal: bool) ->
 )
 @click.option(
     "--preset",
-    type=click.Choice(["production", "ai-agent"]),
+    type=click.Choice(
+        [
+            "production",
+            "ai-agent",
+            "production-saas",
+            "b2b-multi-tenant",
+            "internal-tool",
+            "embedded-chatbot",
+            "blog-saas",
+            "consumer-app",
+            "dev-playground",
+        ]
+    ),
     default=None,
-    help="Apply configuration preset",
+    help=(
+        "Apply configuration preset. Run `fastapi-fullstack templates` for full descriptions."
+    ),
 )
 @click.option(
     "--rag",
@@ -345,6 +598,23 @@ def new(output: Path | None, no_input: bool, name: str | None, minimal: bool) ->
     default=False,
     help="Generate marketing/landing pages",
 )
+@click.option(
+    "--i18n/--no-i18n",
+    "i18n",
+    default=True,
+    help="Generate i18n infrastructure (next-intl + locale switcher). "
+    "Disable for single-language English-only frontends.",
+)
+@click.option(
+    "--example-resource",
+    is_flag=True,
+    default=False,
+    help=(
+        "Scaffold an example Item CRUD (model + repo + service + routes + "
+        "migration) as a reference for adding new domains. "
+        "Requires --database postgresql|sqlite."
+    ),
+)
 @click.option("--changelog", is_flag=True, default=False, help="Generate changelog page")
 @click.option("--testimonials", is_flag=True, default=False, help="Generate testimonials section")
 @click.option(
@@ -380,9 +650,17 @@ def create(
     caching: bool,
     rate_limiting: bool,
     admin_panel: bool,
+    admin_features: str | None,
     task_queue: str,
     oauth_google: bool,
+    auth_mode: str,
+    shared_secret_jwt: bool,
+    external_user_id: bool,
+    websockets: bool,
+    web_search: bool,
+    web_fetch: bool,
     session_management: bool,
+    reverse_proxy: str,
     kubernetes: bool,
     ci: str,
     sentry: bool,
@@ -415,6 +693,8 @@ def create(
     email_provider: str,
     newsletter: bool,
     marketing_site: bool,
+    i18n: bool,
+    example_resource: bool,
     changelog: bool,
     testimonials: bool,
     comparison_pages: bool,
@@ -468,6 +748,235 @@ def create(
                 python_version=python_version,
                 timezone=timezone,
             )
+        elif preset == "production-saas":
+            # Full SaaS stack: Stripe billing + credits + teams + admin + email +
+            # Sentry + Kubernetes + GitHub Actions. Postgres + Redis + RAG-ready.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                enable_logfire=True,
+                enable_redis=True,
+                enable_caching=True,
+                enable_rate_limiting=True,
+                enable_sentry=True,
+                enable_prometheus=True,
+                enable_admin_panel=True,
+                enable_session_management=True,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                enable_langsmith=ai_framework in ("langchain", "langgraph", "deepagents"),
+                enable_teams=True,
+                enable_billing=True,
+                enable_credits_system=True,
+                enable_usage_dashboard=True,
+                enable_email=True,
+                email_provider=EmailProviderType.RESEND,
+                enable_marketing_site=True,
+                enable_docker=True,
+                enable_kubernetes=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "b2b-multi-tenant":
+            # B2B with workspaces, billing, credits, usage dashboard, admin.
+            # Note: full scenario also wants invite-only signup + 2FA — those
+            # require new --auth-mode flag which doesn't exist yet (see notes/
+            # thingstofix.md §A). For now we ship session_management + admin so
+            # account-takeover surface is reasonable.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                enable_logfire=True,
+                enable_redis=True,
+                enable_caching=True,
+                enable_rate_limiting=True,
+                enable_sentry=True,
+                enable_admin_panel=True,
+                enable_session_management=True,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                enable_teams=True,
+                enable_billing=True,
+                enable_credits_system=True,
+                enable_usage_dashboard=True,
+                enable_email=True,
+                email_provider=EmailProviderType.RESEND,
+                enable_marketing_site=False,
+                enable_docker=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "internal-tool":
+            # Internal tool / staff dashboard: SSO via Google OAuth, no public
+            # signup landing pages, no billing. Teams + admin enabled. Note:
+            # SSO-only enforcement (disable email/password registration) needs
+            # --auth-mode=sso-only which is wishlist (see thingstofix §A).
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                enable_logfire=True,
+                enable_redis=True,
+                enable_admin_panel=True,
+                enable_session_management=True,
+                oauth_provider=OAuthProvider.GOOGLE,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                enable_teams=True,
+                enable_billing=False,
+                enable_marketing_site=False,
+                enable_docker=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "embedded-chatbot":
+            # Chat widget to be embedded in client's existing site. Delegated
+            # auth — backend trusts JWTs from client's IdP (Auth0/Clerk/...).
+            # No marketing pages, no teams, no billing. Note: --embed-mode
+            # (widget loader + iframe-ready chat) is still wishlist; deployer
+            # wires client-side embed integration manually.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                auth_mode=AuthMode.DELEGATED,
+                enable_logfire=True,
+                enable_redis=False,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                enable_teams=False,
+                enable_billing=False,
+                enable_marketing_site=False,
+                enable_session_management=False,
+                enable_admin_panel=False,
+                background_tasks=BackgroundTaskType.NONE,
+                enable_docker=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "blog-saas":
+            # Content-first SaaS with auth + marketing/blog/legal. Note: --no-ai
+            # is wishlist; for now AI is generated but unused if you don't
+            # surface chat in the marketing nav. Drop --rag and skip credits.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                enable_logfire=False,
+                enable_redis=False,
+                enable_websockets=False,
+                ai_framework=AIFrameworkType.PYDANTIC_AI,
+                llm_provider=LLMProviderType.OPENAI,
+                enable_teams=False,
+                enable_billing=False,
+                enable_email=True,
+                email_provider=EmailProviderType.RESEND,
+                enable_newsletter_signup=True,
+                enable_marketing_site=True,
+                enable_changelog=True,
+                enable_admin_panel=False,
+                background_tasks=BackgroundTaskType.NONE,
+                enable_docker=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "consumer-app":
+            # B2C consumer SaaS: OAuth login, marketing site, billing.
+            # Note: --magic-link, --analytics=plausible|posthog, and
+            # --billing=consumer (one-time purchases vs subscription) are
+            # wishlist. For now we ship Google OAuth + Stripe subscription.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.POSTGRESQL,
+                enable_logfire=True,
+                enable_redis=True,
+                enable_caching=True,
+                enable_sentry=True,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                oauth_provider=OAuthProvider.GOOGLE,
+                enable_teams=True,
+                enable_billing=True,
+                enable_credits_system=True,
+                enable_email=True,
+                email_provider=EmailProviderType.RESEND,
+                enable_marketing_site=True,
+                enable_admin_panel=True,
+                enable_session_management=True,
+                enable_docker=True,
+                ci_type=CIType.GITHUB,
+                generate_env=not no_env,
+                frontend=FrontendType.NEXTJS,
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
+        elif preset == "dev-playground":
+            # Local prototyping for AI features: SQLite, no Docker, no CI,
+            # ChromaDB (file-based vector store, no separate Milvus container).
+            # Use this when iterating on agents/prompts/RAG locally without
+            # spinning up the full production stack.
+            config = ProjectConfig(
+                project_name=name,
+                database=DatabaseType.SQLITE,
+                enable_logfire=False,
+                enable_redis=False,
+                enable_caching=False,
+                enable_rate_limiting=False,
+                enable_pagination=False,
+                enable_admin_panel=False,
+                enable_websockets=True,
+                ai_framework=AIFrameworkType(ai_framework),
+                llm_provider=LLMProviderType(llm_provider),
+                enable_teams=False,
+                enable_billing=False,
+                enable_marketing_site=False,
+                enable_docker=False,
+                enable_kubernetes=False,
+                background_tasks=BackgroundTaskType.NONE,
+                ci_type=CIType.NONE,
+                generate_env=not no_env,
+                frontend=FrontendType(frontend),
+                brand_color=BrandColorType(brand_color),
+                backend_port=backend_port,
+                frontend_port=frontend_port,
+                python_version=python_version,
+                timezone=timezone,
+            )
         elif minimal:
             config = ProjectConfig(
                 project_name=name,
@@ -491,6 +1000,48 @@ def create(
                 timezone=timezone,
             )
         else:
+            # Pre-flight: catch common conflicting combinations BEFORE Pydantic
+            # validation so users get all errors at once with quick-fix hints.
+            # Pydantic still runs after this and is the source of truth.
+            _preflight_check(
+                billing=billing,
+                credits=credits,
+                teams=teams,
+                usage_dashboard=usage_dashboard,
+                anomaly_detection=anomaly_detection,
+                slack_alerts=slack_alerts,
+                newsletter=newsletter,
+                email=email,
+                rag=rag,
+                database=database,
+                vector_store=vector_store,
+                frontend=frontend,
+                admin_panel=admin_panel,
+                marketing_site=marketing_site,
+                oauth_google=oauth_google,
+                gdrive_rag=gdrive_rag,
+                s3_rag=s3_rag,
+                task_queue=task_queue,
+                redis=redis,
+                caching=caching,
+                rate_limiting=rate_limiting,
+                llm_provider=llm_provider,
+            )
+
+            # Parse --admin-features comma-separated list
+            _all_admin = {"users", "orgs", "subs", "usage", "events", "audit", "health"}
+            if admin_features is not None:
+                _chosen = {f.strip() for f in admin_features.split(",")} & _all_admin
+            else:
+                _chosen = _all_admin  # default: all enabled
+
+            # Map --reverse-proxy shorthand to ReverseProxyType
+            _rp_map = {
+                "none": ReverseProxyType.NONE,
+                "nginx": ReverseProxyType.NGINX_EXTERNAL,
+                "traefik": ReverseProxyType.TRAEFIK_EXTERNAL,
+            }
+
             # Full custom configuration with all options
             config = ProjectConfig(
                 project_name=name,
@@ -511,9 +1062,23 @@ def create(
                 enable_caching=caching,
                 enable_rate_limiting=rate_limiting,
                 enable_admin_panel=admin_panel,
+                enable_admin_features_users="users" in _chosen,
+                enable_admin_features_organizations="orgs" in _chosen,
+                enable_admin_features_subscriptions="subs" in _chosen,
+                enable_admin_features_usage="usage" in _chosen,
+                enable_admin_features_stripe_events="events" in _chosen,
+                enable_admin_features_audit_log="audit" in _chosen,
+                enable_admin_features_system_health="health" in _chosen,
                 background_tasks=BackgroundTaskType(task_queue),
                 oauth_provider=OAuthProvider.GOOGLE if oauth_google else OAuthProvider.NONE,
+                auth_mode=AuthMode(auth_mode),
+                delegated_auth_use_shared_secret=shared_secret_jwt,
+                enable_external_user_id_in_conversations=external_user_id,
+                enable_websockets=websockets,
+                enable_web_search=web_search,
+                enable_web_fetch=web_fetch,
                 enable_session_management=session_management,
+                reverse_proxy=_rp_map[reverse_proxy],
                 enable_kubernetes=kubernetes,
                 ci_type=CIType(ci),
                 enable_sentry=sentry,
@@ -546,6 +1111,8 @@ def create(
                 email_provider=EmailProviderType(email_provider),
                 enable_newsletter_signup=newsletter,
                 enable_marketing_site=marketing_site,
+                enable_i18n=i18n,
+                include_example_crud=example_resource,
                 enable_changelog=changelog,
                 enable_testimonials=testimonials,
                 enable_comparison_pages=comparison_pages,
@@ -585,11 +1152,32 @@ def templates() -> None:
     console.print()
 
     console.print("[bold]Presets:[/]")
-    console.print("  --preset production   Full production setup (Redis, Sentry, K8s, etc.)")
+    console.print("  --preset production       Full production setup (Redis, Sentry, K8s, etc.)")
     console.print(
-        "  --preset ai-agent     AI agent with WebSocket streaming + conversation persistence"
+        "  --preset ai-agent         AI agent with WebSocket streaming + conversation persistence"
     )
-    console.print("  --minimal             Minimal project (SQLite, no Docker/K8s/CI, no Redis)")
+    console.print(
+        "  --preset production-saas  Full SaaS: Stripe billing + credits + teams + admin + email + Sentry + K8s"
+    )
+    console.print(
+        "  --preset b2b-multi-tenant Workspaces + billing + credits + usage dashboard (no marketing pages)"
+    )
+    console.print(
+        "  --preset internal-tool    Staff dashboard: Google SSO + teams + admin, no billing/marketing"
+    )
+    console.print(
+        "  --preset embedded-chatbot Chat widget for embed in client's site (no marketing/teams/billing)"
+    )
+    console.print(
+        "  --preset blog-saas        Content-first SaaS: marketing + blog + changelog + newsletter (minimal AI)"
+    )
+    console.print(
+        "  --preset consumer-app     B2C app: OAuth + marketing + billing + credits"
+    )
+    console.print(
+        "  --preset dev-playground   Local AI prototyping: SQLite + no Docker/K8s, fast iteration"
+    )
+    console.print("  --minimal                 Minimal project (SQLite, no Docker/K8s/CI, no Redis)")
     console.print()
 
     console.print("[bold]Databases:[/]")
@@ -603,8 +1191,12 @@ def templates() -> None:
     console.print("[bold]Authentication (always included):[/]")
     console.print("  JWT + User Management (email/password, roles, profiles)")
     console.print("  API Key utility (X-API-Key header, available for custom use)")
-    console.print("  --oauth-google         Enable Google OAuth")
-    console.print("  --session-management   Enable session management")
+    console.print("  --oauth-google                 Enable Google OAuth")
+    console.print("  --session-management           Enable session management")
+    console.print("  --auth-mode local              Default: backend handles email/password + OAuth")
+    console.print("  --auth-mode delegated          Trust JWTs from external IdP (Auth0/Clerk/Cognito/Keycloak)")
+    console.print("  --shared-secret-jwt            With delegated: use HMAC shared secret instead of JWKS")
+    console.print("  --external-user-id             With delegated: store IdP sub on Conversation rows")
     console.print()
 
     console.print("[bold]AI Agent:[/]")
@@ -617,6 +1209,9 @@ def templates() -> None:
     console.print("  --llm-provider anthropic        Anthropic (claude-sonnet-4-5)")
     console.print("  --llm-provider google           Google Gemini (gemini-2.0-flash)")
     console.print("  --llm-provider openrouter       OpenRouter (pydantic_ai only)")
+    console.print("  --websockets                    Enable WebSocket support (real-time chat streaming)")
+    console.print("  --web-search                    Enable web search tool for AI agents (Tavily)")
+    console.print("  --web-fetch                     Enable web fetch/scraping tool for AI agents")
     console.print()
 
     console.print("[bold]Background Tasks:[/]")
@@ -629,12 +1224,16 @@ def templates() -> None:
     console.print("[bold]Frontend:[/]")
     console.print("  --frontend none        API only (no frontend)")
     console.print("  --frontend nextjs      Next.js 15 (App Router, TypeScript, Bun, i18n)")
+    console.print("  --no-i18n              Single-language English-only frontend (no locale switcher)")
+    console.print("  --marketing-site       Generate marketing/landing pages (blog, pricing, legal)")
+    console.print("  --changelog            Generate changelog page")
     console.print()
 
     console.print("[bold]RAG (Retrieval Augmented Generation):[/]")
     console.print("  --rag                               Enable RAG")
     console.print("  --vector-store milvus|qdrant|chromadb|pgvector  Vector store backend")
     console.print("  --gdrive-rag                        Enable Google Drive ingestion")
+    console.print("  --s3-rag                            Enable S3/MinIO ingestion")
     console.print("  --reranker none|cohere|cross_encoder Reranker logic")
     console.print("  --pdf-parser pymupdf|liteparse|llamaparse  PDF parser")
     console.print()
@@ -644,8 +1243,22 @@ def templates() -> None:
     console.print("  --caching          Enable caching (requires --redis)")
     console.print("  --rate-limiting    Enable rate limiting")
     console.print("  --admin-panel      Enable admin panel (SQLAdmin)")
+    console.print("  --admin-features users,orgs,subs,usage,events,audit,health")
+    console.print("                     Select which admin panel sections to enable (default: all)")
     console.print("  --file-storage     Enable S3/MinIO file storage")
     console.print("  --webhooks         Enable webhooks support")
+    console.print("  --telegram         Enable Telegram bot integration")
+    console.print("  --slack            Enable Slack app integration")
+    console.print()
+
+    console.print("[bold]Teams & Billing:[/]")
+    console.print("  --teams            Enable multi-tenant organizations")
+    console.print("  --billing          Enable Stripe billing (requires --teams)")
+    console.print("  --credits          Enable credits system (requires --billing)")
+    console.print("  --usage-dashboard  Enable usage dashboard (requires --credits)")
+    console.print("  --email            Enable transactional email")
+    console.print("  --email-provider resend|smtp|log  Email provider (default: log)")
+    console.print("  --newsletter       Enable newsletter signup (requires --email)")
     console.print()
 
     console.print("[bold]Observability:[/]")
@@ -656,11 +1269,20 @@ def templates() -> None:
     console.print()
 
     console.print("[bold]DevOps:[/]")
-    console.print("  --no-docker        Disable Docker files")
-    console.print("  --kubernetes       Generate Kubernetes manifests")
-    console.print("  --ci github        GitHub Actions (default)")
-    console.print("  --ci gitlab        GitLab CI")
-    console.print("  --ci none          No CI/CD")
+    console.print("  --no-docker                  Disable Docker files")
+    console.print("  --kubernetes                 Generate Kubernetes manifests")
+    console.print("  --reverse-proxy none         No reverse proxy, expose ports directly")
+    console.print("  --reverse-proxy nginx        External Nginx config template (default)")
+    console.print("  --reverse-proxy traefik      External Traefik labels only")
+    console.print("  --ci github                  GitHub Actions (default)")
+    console.print("  --ci gitlab                  GitLab CI")
+    console.print("  --ci none                    No CI/CD")
+    console.print()
+
+    console.print("[bold]Scaffold:[/]")
+    console.print("  --example-resource    Generate example Item CRUD scaffold")
+    console.print("                        (model → repo → service → route → migration)")
+    console.print("                        Requires --database postgresql|sqlite")
     console.print()
 
     console.print("[bold]Other:[/]")

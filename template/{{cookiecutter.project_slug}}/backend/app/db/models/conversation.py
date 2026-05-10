@@ -222,6 +222,16 @@ class Conversation(Base, TimestampMixin):
         index=True,
     )
 {%- endif %}
+{%- if cookiecutter.use_external_user_id_in_conversations %}
+    # Denormalized copy of `users.external_user_id` (the IdP `sub` claim) so
+    # client APIs can list conversations by THEIR user identifier without
+    # joining through users + leaking internal UUIDs. Populated by the agent
+    # service from the resolved `current_user.external_user_id` at
+    # `persist_user_turn` time. Index — most lookups go through this column.
+    external_user_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
+{%- endif %}
 {%- if cookiecutter.enable_teams and cookiecutter.use_jwt %}
     organization_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),

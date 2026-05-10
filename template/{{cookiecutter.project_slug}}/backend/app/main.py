@@ -468,11 +468,30 @@ def create_app() -> FastAPI:
         inprogress_name="http_requests_inprogress",
         inprogress_labels=True,
     )
-    instrumentator.instrument(app).expose(
-        app,
-        endpoint=settings.PROMETHEUS_METRICS_PATH,
-        include_in_schema=settings.PROMETHEUS_INCLUDE_IN_SCHEMA,
-    )
+    # Optional Bearer-token guard so the metrics endpoint can be exposed on a
+    # public ingress without leaking internals. When PROMETHEUS_AUTH_TOKEN is
+    # empty the endpoint is unauthenticated (typical for private networks).
+    if settings.PROMETHEUS_AUTH_TOKEN:
+        from fastapi import Depends, Header, HTTPException, status as http_status
+
+        def _verify_metrics_token(authorization: str = Header(default="")) -> None:
+            expected = f"Bearer {settings.PROMETHEUS_AUTH_TOKEN}"
+            import secrets as _secrets
+            if not _secrets.compare_digest(authorization, expected):
+                raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED)
+
+        instrumentator.instrument(app).expose(
+            app,
+            endpoint=settings.PROMETHEUS_METRICS_PATH,
+            include_in_schema=settings.PROMETHEUS_INCLUDE_IN_SCHEMA,
+            dependencies=[Depends(_verify_metrics_token)],
+        )
+    else:
+        instrumentator.instrument(app).expose(
+            app,
+            endpoint=settings.PROMETHEUS_METRICS_PATH,
+            include_in_schema=settings.PROMETHEUS_INCLUDE_IN_SCHEMA,
+        )
 {%- endif %}
 
 {%- if cookiecutter.enable_rate_limiting %}
