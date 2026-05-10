@@ -89,7 +89,7 @@ export function Header() {
                     {user?.avatar_url && (
                       <AvatarImage src={`/api/users/avatar/${user.id}`} alt={user.email} />
                     )}
-                    <AvatarFallback className="bg-brand/10 text-brand text-[10px]">
+                    <AvatarFallback className="bg-foreground text-background text-[10px] font-semibold">
                       {user?.email?.substring(0, 2).toUpperCase() || "U"}
                     </AvatarFallback>
                   </Avatar>
