@@ -36,7 +36,9 @@ export function useAdminConversations() {
       limit?: number;
       search?: string;
       user_id?: string;
-      include_archived?: boolean;
+      status?: "active" | "archived" | "all";
+      sort_by?: string;
+      sort_dir?: "asc" | "desc";
     }) => {
       startLoad();
       setError(null);
@@ -46,7 +48,9 @@ export function useAdminConversations() {
         if (params?.limit) query.set("limit", String(params.limit));
         if (params?.search) query.set("search", params.search);
         if (params?.user_id) query.set("user_id", params.user_id);
-        if (params?.include_archived) query.set("include_archived", "true");
+        if (params?.status) query.set("status", params.status);
+        if (params?.sort_by) query.set("sort_by", params.sort_by);
+        if (params?.sort_dir) query.set("sort_dir", params.sort_dir);
 
         const response = await apiClient.get<AdminConversationListResponse>(
           `/admin/conversations?${query.toString()}`,
@@ -64,7 +68,13 @@ export function useAdminConversations() {
   );
 
   const fetchUsers = useCallback(
-    async (params?: { skip?: number; limit?: number; search?: string }) => {
+    async (params?: {
+      skip?: number;
+      limit?: number;
+      search?: string;
+      sort_by?: string;
+      sort_dir?: "asc" | "desc";
+    }) => {
       startLoad();
       setError(null);
       try {
@@ -72,6 +82,8 @@ export function useAdminConversations() {
         if (params?.skip) query.set("skip", String(params.skip));
         if (params?.limit) query.set("limit", String(params.limit));
         if (params?.search) query.set("search", params.search);
+        if (params?.sort_by) query.set("sort_by", params.sort_by);
+        if (params?.sort_dir) query.set("sort_dir", params.sort_dir);
 
         const response = await apiClient.get<AdminUserListResponse>(
           `/admin/conversations/users?${query.toString()}`,

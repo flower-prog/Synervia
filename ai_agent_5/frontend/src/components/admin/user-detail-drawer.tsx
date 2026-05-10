@@ -5,6 +5,7 @@ import { ArrowUpRight, Copy, KeyRound, Mail, Shield, ShieldOff, Trash2, UserX } 
 import { toast } from "sonner";
 
 import { LoadingState } from "@/components/states";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -113,9 +114,10 @@ export function UserDetailDrawer({
       >
         {/* Header */}
         <header className="border-foreground/10 flex items-center gap-4 border-b px-6 py-5">
-          <span className="bg-foreground text-background flex h-12 w-12 shrink-0 items-center justify-center rounded-full font-mono text-sm font-semibold">
-            {initials || "?"}
-          </span>
+          <Avatar className="h-12 w-12 shrink-0">
+            <AvatarImage src={`/api/users/avatar/${user.id}`} alt={user.email} />
+            <AvatarFallback className="font-mono text-sm">{initials || "?"}</AvatarFallback>
+          </Avatar>
           <div className="min-w-0 flex-1">
             <p className="text-foreground truncate text-base font-semibold">
               {user.full_name || user.email.split("@")[0]}

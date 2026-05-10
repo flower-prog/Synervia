@@ -1,11 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Filter, RefreshCw, Search } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronRight as ChevronRightIcon,
+  Filter,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 
-import { LoadingState } from "@/components/states";
-import { Badge, Button, Input } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { apiClient } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +50,10 @@ interface StripeEvent {
   last_error?: string | null;
 }
 
-const STATUS_FILTER_OPTIONS = ["all", "processed", "failed", "pending"] as const;
-type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+type SortDir = "asc" | "desc";
+type SortKey = "type" | "customer_email" | "amount_cents" | "status" | "created_at";
+type StatusFilter = "all" | "processed" | "failed" | "pending";
 
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
@@ -33,7 +63,6 @@ function formatDateTime(iso: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
   });
 }
 
@@ -49,7 +78,6 @@ function formatAmount(
   });
 }
 
-// Stub data for the layout — backend wishlist: GET /admin/stripe-events
 const STUB_EVENTS: StripeEvent[] = [
   {
     id: "evt_3PqWzL2eZvKYlo2C0K",
@@ -121,6 +149,12 @@ export default function StripeEventsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<{ by: SortKey; dir: SortDir }>({
+    by: "created_at",
+    dir: "desc",
+  });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [usingStub, setUsingStub] = useState(false);
 
@@ -128,7 +162,7 @@ export default function StripeEventsPage() {
     setLoading(true);
     try {
       const data = await apiClient
-        .get<{ items: StripeEvent[] }>("/admin/stripe-events?limit=50")
+        .get<{ items: StripeEvent[] }>("/admin/stripe-events?limit=500")
         .catch(() => null);
       if (data) {
         setEvents(data.items);
@@ -146,10 +180,15 @@ export default function StripeEventsPage() {
     load();
   }, []);
 
-  const filtered = useMemo(() => {
+  // Reset page on filter change
+  useEffect(() => {
+    setPage(0);
+  }, [search, statusFilter, pageSize, sort.by, sort.dir]);
+
+  const filteredSorted = useMemo(() => {
     if (!events) return [];
     const q = search.trim().toLowerCase();
-    return events.filter((e) => {
+    const filtered = events.filter((e) => {
       if (statusFilter !== "all" && e.status !== statusFilter) return false;
       if (q) {
         return (
@@ -160,7 +199,21 @@ export default function StripeEventsPage() {
       }
       return true;
     });
-  }, [events, search, statusFilter]);
+    filtered.sort((a, b) => {
+      const av = (a[sort.by] ?? "") as string | number;
+      const bv = (b[sort.by] ?? "") as string | number;
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return filtered;
+  }, [events, search, statusFilter, sort.by, sort.dir]);
+
+  const total = filteredSorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const pageItems = useMemo(
+    () => filteredSorted.slice(page * pageSize, (page + 1) * pageSize),
+    [filteredSorted, page, pageSize],
+  );
 
   const handleReplay = async (evt: StripeEvent) => {
     if (usingStub) {
@@ -176,215 +229,265 @@ export default function StripeEventsPage() {
     }
   };
 
+  const toggleSort = (key: SortKey) =>
+    setSort((s) =>
+      s.by === key ? { by: key, dir: s.dir === "asc" ? "desc" : "asc" } : { by: key, dir: "desc" },
+    );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex h-full flex-col p-6">
+      <div className="mb-6 flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-foreground text-xl font-semibold tracking-tight">
-            Stripe events
-          </h2>
-          <p className="text-foreground/55 text-xs">
+          <h1 className="text-2xl font-bold">Stripe events</h1>
+          <p className="text-muted-foreground">
             Webhook event log. Replay failed events to debug billing flows.
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={load} className="rounded-full">
+        <Button size="sm" variant="outline" onClick={load}>
           <RefreshCw className="mr-2 h-3.5 w-3.5" />
           Refresh
         </Button>
       </div>
 
       {usingStub && (
-        <div className="border-foreground/10 bg-foreground/[0.03] flex items-start gap-3 rounded-xl border p-4">
-          <span className="bg-foreground/8 text-foreground inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
-            <Filter className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-foreground text-sm font-medium">Demo data</p>
-            <p className="text-foreground/55 mt-0.5 text-xs leading-relaxed">
-              Backend wiring required. Expected endpoints:{" "}
-              <code className="font-mono">GET /admin/stripe-events</code>,{" "}
-              <code className="font-mono">POST /admin/stripe-events/&#123;id&#125;/replay</code>.
-              Once wired, this page renders real event history.
+        <div className="border-foreground/10 bg-muted/40 mb-4 flex items-start gap-3 rounded-lg border p-3">
+          <Filter className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0 flex-1 text-xs">
+            <p className="text-foreground font-medium">Demo data</p>
+            <p className="text-muted-foreground mt-0.5">
+              Backend wiring required. Expected: <code>GET /admin/stripe-events</code>,{" "}
+              <code>POST /admin/stripe-events/&#123;id&#125;/replay</code>.
             </p>
           </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-xs">
-          <Search className="text-foreground/45 absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1">
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Search id, type, customer…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9 rounded-full pl-9 text-sm"
+            className="pl-10"
           />
         </div>
-        <div className="flex gap-1">
-          {STATUS_FILTER_OPTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setStatusFilter(s)}
-              className={cn(
-                "border-foreground/15 inline-flex rounded-full border px-3 py-1.5 font-mono text-[11px] tracking-wider uppercase transition-colors",
-                statusFilter === s
-                  ? "bg-foreground text-background border-foreground"
-                  : "text-foreground/65 hover:text-foreground hover:border-foreground/40",
-              )}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Events table */}
-      <div className="border-foreground/10 bg-card overflow-hidden rounded-2xl border">
-        <div className="border-foreground/10 text-foreground/55 hidden grid-cols-[24px_1.4fr_1fr_0.8fr_0.5fr_0.5fr_80px] items-center gap-3 border-b px-5 py-3 font-mono text-[10px] tracking-wider uppercase sm:grid">
-          <span />
-          <span>Event</span>
-          <span>Customer</span>
-          <span>Amount</span>
-          <span>Status</span>
-          <span>Time</span>
-          <span className="text-right">Action</span>
-        </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="processed">Processed</SelectItem>
+            <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
 
-        {loading ? (
-          <div className="p-5">
-            <LoadingState variant="skeleton-list" rows={6} />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-10 text-center">
-            <p className="text-foreground/55 text-sm">No events match.</p>
-          </div>
-        ) : (
-          <ul className="divide-foreground/10 divide-y">
-            {filtered.map((e) => (
-              <li key={e.id}>
-                <div
-                  className="hover:bg-foreground/[0.03] grid cursor-pointer grid-cols-[24px_1fr] gap-3 px-5 py-3 transition-colors sm:grid-cols-[24px_1.4fr_1fr_0.8fr_0.5fr_0.5fr_80px]"
-                  onClick={() => setExpanded((cur) => (cur === e.id ? null : e.id))}
-                >
-                  <button
-                    type="button"
-                    aria-label={expanded === e.id ? "Collapse" : "Expand"}
-                    className="text-foreground/45 flex h-6 w-6 items-center justify-center"
-                  >
-                    {expanded === e.id ? (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-
-                  <div className="min-w-0">
-                    <p className="text-foreground truncate text-sm font-medium">{e.type}</p>
-                    <p className="text-foreground/45 truncate font-mono text-[11px]">{e.id}</p>
-                  </div>
-
-                  <div className="hidden min-w-0 truncate text-sm sm:block">
-                    {e.customer_email ?? <span className="text-foreground/40">—</span>}
-                  </div>
-
-                  <div className="hidden text-sm tabular-nums sm:block">
-                    {formatAmount(e.amount_cents, e.currency)}
-                  </div>
-
-                  <div className="hidden sm:block">
-                    <StatusPill status={e.status} attempts={e.attempts} />
-                  </div>
-
-                  <div className="text-foreground/55 hidden font-mono text-[11px] tracking-wider uppercase sm:block">
-                    {formatDateTime(e.created_at)}
-                  </div>
-
-                  <div className="hidden justify-end sm:flex">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        handleReplay(e);
-                      }}
-                      className="rounded-full"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {expanded === e.id && (
-                  <div className="border-foreground/10 bg-foreground/[0.02] border-t px-5 py-4">
-                    <dl className="grid gap-3 text-xs sm:grid-cols-2">
-                      <KV label="Event ID" value={e.id} mono />
-                      <KV label="Type" value={e.type} mono />
-                      <KV
-                        label="Mode"
-                        value={e.livemode ? "live" : "test"}
-                        accent={e.livemode ? "brand" : undefined}
-                      />
-                      <KV label="Attempts" value={String(e.attempts)} />
-                      {e.customer_email && <KV label="Customer" value={e.customer_email} />}
-                      {typeof e.amount_cents === "number" && (
-                        <KV label="Amount" value={formatAmount(e.amount_cents, e.currency)} />
-                      )}
-                      <KV label="Created" value={formatDateTime(e.created_at)} />
-                      {e.last_error && (
-                        <KV label="Last error" value={e.last_error} accent="danger" />
-                      )}
-                    </dl>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReplay(e)}
-                        className="rounded-full"
-                      >
-                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                        Replay
-                      </Button>
-                      <a
-                        href={`https://dashboard.stripe.com/${e.livemode ? "" : "test/"}events/${e.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-foreground/65 hover:text-foreground inline-flex items-center gap-1 font-mono text-[11px] tracking-wider uppercase"
-                      >
-                        Open in Stripe →
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </li>
+        <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+          <SelectTrigger className="w-[110px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n} / page
+              </SelectItem>
             ))}
-          </ul>
-        )}
+          </SelectContent>
+        </Select>
       </div>
+
+      <div className="text-muted-foreground mb-2 text-xs">{total} total</div>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-8" />
+            <SortableHead
+              active={sort.by === "type"}
+              dir={sort.dir}
+              onClick={() => toggleSort("type")}
+            >
+              Event
+            </SortableHead>
+            <SortableHead
+              active={sort.by === "customer_email"}
+              dir={sort.dir}
+              onClick={() => toggleSort("customer_email")}
+            >
+              Customer
+            </SortableHead>
+            <SortableHead
+              active={sort.by === "amount_cents"}
+              dir={sort.dir}
+              onClick={() => toggleSort("amount_cents")}
+            >
+              Amount
+            </SortableHead>
+            <SortableHead
+              active={sort.by === "status"}
+              dir={sort.dir}
+              onClick={() => toggleSort("status")}
+            >
+              Status
+            </SortableHead>
+            <SortableHead
+              active={sort.by === "created_at"}
+              dir={sort.dir}
+              onClick={() => toggleSort("created_at")}
+            >
+              Time
+            </SortableHead>
+            <TableHead />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {loading && events === null
+            ? Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 7 }).map((__, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            : pageItems.map((e) => {
+                const isExpanded = expanded === e.id;
+                return (
+                  <Fragment key={e.id}>
+                    <TableRow
+                      className="cursor-pointer"
+                      onClick={() => setExpanded((cur) => (cur === e.id ? null : e.id))}
+                    >
+                      <TableCell>
+                        {isExpanded ? (
+                          <ChevronDown className="text-muted-foreground h-4 w-4" />
+                        ) : (
+                          <ChevronRightIcon className="text-muted-foreground h-4 w-4" />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="text-foreground truncate text-sm font-medium">{e.type}</p>
+                          <p className="text-muted-foreground truncate font-mono text-xs">{e.id}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {e.customer_email ?? "—"}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatAmount(e.amount_cents, e.currency)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={e.status} attempts={e.attempts} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {formatDateTime(e.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleReplay(e);
+                          }}
+                          aria-label="Replay event"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={7}>
+                          <dl className="grid gap-3 p-2 text-xs sm:grid-cols-2">
+                            <KV label="Event ID" value={e.id} mono />
+                            <KV label="Type" value={e.type} mono />
+                            <KV label="Mode" value={e.livemode ? "live" : "test"} />
+                            <KV label="Attempts" value={String(e.attempts)} />
+                            {e.customer_email && (
+                              <KV label="Customer" value={e.customer_email} />
+                            )}
+                            {typeof e.amount_cents === "number" && (
+                              <KV
+                                label="Amount"
+                                value={formatAmount(e.amount_cents, e.currency)}
+                              />
+                            )}
+                            <KV label="Created" value={new Date(e.created_at).toLocaleString()} />
+                            {e.last_error && (
+                              <KV label="Last error" value={e.last_error} accent="danger" />
+                            )}
+                          </dl>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 px-2 pb-2">
+                            <Button size="sm" variant="outline" onClick={() => handleReplay(e)}>
+                              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                              Replay
+                            </Button>
+                            <a
+                              href={`https://dashboard.stripe.com/${e.livemode ? "" : "test/"}events/${e.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground inline-flex items-center text-xs"
+                            >
+                              Open in Stripe →
+                            </a>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                );
+              })}
+          {!loading && total === 0 && (
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground py-8 text-center">
+                No events match.
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+
+      <PaginationBar
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        totalPages={totalPages}
+        isLoading={loading}
+        onPrev={() => setPage((p) => Math.max(0, p - 1))}
+        onNext={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+      />
     </div>
   );
 }
 
-function StatusPill({ status, attempts }: { status: StripeEvent["status"]; attempts: number }) {
-  const tone =
-    status === "processed"
-      ? "border-brand/30 text-brand"
-      : status === "failed"
-        ? "border-destructive/30 text-destructive"
-        : "border-yellow-500/30 text-yellow-500";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider uppercase",
-        tone,
-      )}
-    >
-      <span aria-hidden className="h-1 w-1 rounded-full bg-current" />
-      {status}
-      {attempts > 1 && ` · ${attempts}×`}
-    </span>
-  );
+function StatusBadge({
+  status,
+  attempts,
+}: {
+  status: StripeEvent["status"];
+  attempts: number;
+}) {
+  if (status === "processed") {
+    return (
+      <Badge variant="default">
+        Processed{attempts > 1 ? ` · ${attempts}×` : ""}
+      </Badge>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <Badge variant="destructive">
+        Failed{attempts > 1 ? ` · ${attempts}×` : ""}
+      </Badge>
+    );
+  }
+  return <Badge variant="secondary">Pending</Badge>;
 }
 
 function KV({
@@ -396,24 +499,101 @@ function KV({
   label: string;
   value: string;
   mono?: boolean;
-  accent?: "brand" | "danger";
+  accent?: "danger";
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-foreground/45 font-mono text-[10px] tracking-wider uppercase">{label}</dt>
+      <dt className="text-muted-foreground text-[10px] tracking-wider uppercase">{label}</dt>
       <dd
         className={cn(
           "break-all",
           mono ? "font-mono" : "",
-          accent === "brand"
-            ? "text-brand"
-            : accent === "danger"
-              ? "text-destructive"
-              : "text-foreground",
+          accent === "danger" ? "text-destructive" : "text-foreground",
         )}
       >
         {value}
       </dd>
+    </div>
+  );
+}
+
+function SortableHead({
+  active,
+  dir,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "hover:text-foreground inline-flex items-center gap-1 text-left transition-colors",
+          active && "text-foreground",
+        )}
+      >
+        {children}
+        <Icon className={cn("h-3 w-3", !active && "opacity-40")} aria-hidden />
+      </button>
+    </TableHead>
+  );
+}
+
+function PaginationBar({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  isLoading,
+  onPrev,
+  onNext,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  isLoading: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (total === 0) return null;
+  const start = page * pageSize + 1;
+  const end = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="flex items-center justify-between border-t px-4 py-3">
+      <span className="text-muted-foreground text-sm">
+        {start}–{end} of {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onPrev}
+          disabled={page === 0 || isLoading}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="text-muted-foreground px-2 text-sm">
+          {page + 1} / {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onNext}
+          disabled={page >= totalPages - 1 || isLoading}
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

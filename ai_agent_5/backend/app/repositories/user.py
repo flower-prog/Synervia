@@ -140,6 +140,8 @@ async def admin_list_with_counts(
     skip: int = 0,
     limit: int = 50,
     search: str | None = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
 ) -> tuple[list[tuple[User, int]], int]:
     """Admin: list users with their conversation counts.
 
@@ -149,8 +151,9 @@ async def admin_list_with_counts(
 
     from app.db.models.conversation import Conversation
 
+    conv_count_col = func.count(Conversation.id).label("conversation_count")
     query = (
-        select(User, func.count(Conversation.id).label("conversation_count"))
+        select(User, conv_count_col)
         .outerjoin(Conversation, Conversation.user_id == User.id)
         .group_by(User.id)
     )
@@ -161,7 +164,16 @@ async def admin_list_with_counts(
         query = query.where(condition)
         count_query = count_query.where(condition)
 
-    query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
+    sort_columns = {
+        "email": User.email,
+        "full_name": User.full_name,
+        "created_at": User.created_at,
+        "conversations": conv_count_col,
+    }
+    sort_col = sort_columns.get(sort_by, User.created_at)
+    sort_col = sort_col.desc() if sort_dir == "desc" else sort_col.asc()
+    query = query.order_by(sort_col).offset(skip).limit(limit)
+
     total = await db.scalar(count_query) or 0
     rows = (await db.execute(query)).all()
     return [(user, count) for user, count in rows], total

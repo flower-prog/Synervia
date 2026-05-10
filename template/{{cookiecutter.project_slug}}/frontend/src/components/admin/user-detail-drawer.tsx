@@ -1,19 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  ArrowUpRight,
-  Copy,
-  KeyRound,
-  Mail,
-  Shield,
-  ShieldOff,
-  Trash2,
-  UserX,
-} from "lucide-react";
+import { ArrowUpRight, Copy, KeyRound, Mail, Shield, ShieldOff, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
 
 import { LoadingState } from "@/components/states";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -122,9 +114,10 @@ export function UserDetailDrawer({
       >
         {/* Header */}
         <header className="border-foreground/10 flex items-center gap-4 border-b px-6 py-5">
-          <span className="bg-foreground text-background flex h-12 w-12 shrink-0 items-center justify-center rounded-full font-mono text-sm font-semibold">
-            {initials || "?"}
-          </span>
+          <Avatar className="h-12 w-12 shrink-0">
+            <AvatarImage src={`/api/users/avatar/${user.id}`} alt={user.email} />
+            <AvatarFallback className="font-mono text-sm">{initials || "?"}</AvatarFallback>
+          </Avatar>
           <div className="min-w-0 flex-1">
             <p className="text-foreground truncate text-base font-semibold">
               {user.full_name || user.email.split("@")[0]}
@@ -134,7 +127,7 @@ export function UserDetailDrawer({
         </header>
 
         {/* Body */}
-        <div className="scrollbar-thin flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex-1 scrollbar-thin overflow-y-auto px-6 py-5">
           {/* Status pills */}
           <div className="flex flex-wrap gap-1.5">
             <Badge variant={user.is_active ? "default" : "secondary"} className="text-[10px]">
@@ -152,7 +145,7 @@ export function UserDetailDrawer({
           </div>
 
           {/* Profile fields */}
-          <dl className="border-foreground/10 mt-5 divide-y divide-foreground/10 rounded-xl border">
+          <dl className="border-foreground/10 divide-foreground/10 mt-5 divide-y rounded-xl border">
             <KV label="User ID" value={user.id} mono onCopy={handleCopyId} />
             <KV label="Email" value={user.email} mono />
             {user.full_name && <KV label="Display name" value={user.full_name} />}
@@ -162,7 +155,7 @@ export function UserDetailDrawer({
 
           {/* Recent conversations */}
           <section className="mt-7">
-            <h3 className="text-foreground/55 mb-3 font-mono text-[11px] uppercase tracking-wider">
+            <h3 className="text-foreground/55 mb-3 font-mono text-[11px] tracking-wider uppercase">
               Recent conversations
             </h3>
             {convsLoading ? (
@@ -180,7 +173,7 @@ export function UserDetailDrawer({
                       <p className="text-foreground truncate text-xs font-medium">
                         {c.title || "Untitled"}
                       </p>
-                      <p className="text-foreground/45 truncate font-mono text-[10px] uppercase tracking-wider">
+                      <p className="text-foreground/45 truncate font-mono text-[10px] tracking-wider uppercase">
                         {formatDateTime(c.created_at)}
                         {typeof c.message_count === "number" && ` · ${c.message_count} msg`}
                       </p>
@@ -237,12 +230,7 @@ export function UserDetailDrawer({
               </>
             )}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleImpersonate}
-            className="rounded-full"
-          >
+          <Button variant="outline" size="sm" onClick={handleImpersonate} className="rounded-full">
             <KeyRound className="mr-1.5 h-3.5 w-3.5" />
             Impersonate
           </Button>
@@ -299,11 +287,9 @@ function KV({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-      <dt className="text-foreground/55 font-mono text-[10px] uppercase tracking-wider">
-        {label}
-      </dt>
+      <dt className="text-foreground/55 font-mono text-[10px] tracking-wider uppercase">{label}</dt>
       <dd className="flex items-center gap-2">
-        <span className={mono ? "font-mono text-foreground text-xs" : "text-foreground text-xs"}>
+        <span className={mono ? "text-foreground font-mono text-xs" : "text-foreground text-xs"}>
           {value}
         </span>
         {onCopy && (
@@ -320,4 +306,3 @@ function KV({
     </div>
   );
 }
-

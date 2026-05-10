@@ -124,7 +124,9 @@ export interface AdminUser {
   id: string;
   email: string;
   full_name?: string;
+  role?: string;
   is_active: boolean;
+  is_app_admin?: boolean;
   conversation_count: number;
   created_at: string;
 }

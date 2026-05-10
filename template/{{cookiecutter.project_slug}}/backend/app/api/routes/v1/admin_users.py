@@ -1,7 +1,7 @@
 {%- if cookiecutter.use_jwt %}
 """Admin user management routes.
 
-All endpoints require the is_app_admin flag (CurrentAppAdmin).
+All endpoints require the admin role (CurrentAdmin).
 
 Endpoints:
     GET    /admin/users                   — List all users (paginated + search)
@@ -19,23 +19,24 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
 
-from app.api.deps import CurrentAppAdmin, DBSession, UserSvc
+from app.api.deps import CurrentAdmin, DBSession, UserSvc
 {%- if cookiecutter.enable_teams %}
 from app.core.audit import record_audit
 {%- endif %}
 from app.core.security import create_access_token
+from app.schemas.conversation_share import AdminUserList
 from app.schemas.user import UserRead, UserUpdate
 
 router = APIRouter()
 
 {%- if cookiecutter.use_postgresql %}
 
-@router.get("", response_model=dict)
+@router.get("", response_model=AdminUserList)
 async def list_users(
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     search: str | None = Query(None),
 ) -> Any:
     result = await service.admin_list_with_counts(skip=skip, limit=limit, search=search)
@@ -45,7 +46,7 @@ async def list_users(
 @router.get("/{user_id}", response_model=UserRead)
 async def get_user(
     user_id: UUID,
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
 ) -> Any:
     return await service.get_by_id(user_id)
@@ -56,7 +57,7 @@ async def update_user(
     request: Request,
     user_id: UUID,
     user_in: UserUpdate,
-    admin: CurrentAppAdmin,
+    admin: CurrentAdmin,
     db: DBSession,
     service: UserSvc,
 ) -> Any:
@@ -79,7 +80,7 @@ async def update_user(
 async def delete_user(
     request: Request,
     user_id: UUID,
-    admin: CurrentAppAdmin,
+    admin: CurrentAdmin,
     db: DBSession,
     service: UserSvc,
 ) -> None:
@@ -105,7 +106,7 @@ async def delete_user(
 async def impersonate_user(
     request: Request,
     user_id: UUID,
-    admin: CurrentAppAdmin,
+    admin: CurrentAdmin,
     db: DBSession,
     service: UserSvc,
 ) -> Any:
@@ -136,12 +137,12 @@ async def impersonate_user(
 
 {%- elif cookiecutter.use_sqlite %}
 
-@router.get("", response_model=dict)
+@router.get("", response_model=AdminUserList)
 def list_users(
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=500),
     search: str | None = Query(None),
 ) -> Any:
     return service.admin_list_with_counts(skip=skip, limit=limit, search=search)
@@ -150,7 +151,7 @@ def list_users(
 @router.get("/{user_id}", response_model=UserRead)
 def get_user(
     user_id: str,
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
 ) -> Any:
     return service.get_by_id(user_id)
@@ -160,7 +161,7 @@ def get_user(
 def update_user(
     user_id: str,
     user_in: UserUpdate,
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
 ) -> Any:
     return service.update(user_id, user_in)
@@ -169,7 +170,7 @@ def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_user(
     user_id: str,
-    _: CurrentAppAdmin,
+    _: CurrentAdmin,
     service: UserSvc,
 ) -> None:
     service.get_by_id(user_id)
@@ -179,7 +180,7 @@ def delete_user(
 @router.post("/{user_id}/impersonate", response_model=dict)
 def impersonate_user(
     user_id: str,
-    admin: CurrentAppAdmin,
+    admin: CurrentAdmin,
     service: UserSvc,
 ) -> Any:
     target = service.get_by_id(user_id)

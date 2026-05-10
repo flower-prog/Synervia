@@ -84,6 +84,8 @@ class UserService:
         skip: int = 0,
         limit: int = 50,
         search: str | None = None,
+        sort_by: str = "created_at",
+        sort_dir: str = "desc",
     ) -> "AdminUserList":
         """Admin: list users with conversation counts."""
         from app.schemas.conversation_share import AdminUserList, AdminUserRead
@@ -93,13 +95,17 @@ class UserService:
             skip=skip,
             limit=limit,
             search=search,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         items = [
             AdminUserRead(
                 id=user.id,
                 email=user.email,
                 full_name=user.full_name,
+                role=user.role,
                 is_active=user.is_active,
+                is_app_admin=getattr(user, "is_app_admin", False),
                 conversation_count=conv_count,
                 created_at=user.created_at,
             )

@@ -17,6 +17,7 @@ import {
   UserCircle,
   Building2,
   CreditCard,
+  ShieldAlert,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
 import { useSidebarStore } from "@/stores";
@@ -29,6 +30,7 @@ const adminNavItems = [
   { name: "Organizations", href: ROUTES.ORGS, icon: Building2, adminOnly: false },
   { name: "Billing", href: ROUTES.BILLING, icon: CreditCard, adminOnly: false },
   { name: "Profile", href: ROUTES.PROFILE, icon: UserCircle, adminOnly: false },
+  { name: "Admin", href: ROUTES.ADMIN, icon: ShieldAlert, adminOnly: true },
 ];
 
 export function Header() {

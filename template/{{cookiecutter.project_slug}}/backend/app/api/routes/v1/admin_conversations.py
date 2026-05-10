@@ -10,7 +10,7 @@ Endpoints:
     GET  /admin/users/{user_id}/conversations — List conversations for a specific user
 """
 
-from typing import Any
+from typing import Any, Literal
 
 {%- if cookiecutter.use_postgresql %}
 from uuid import UUID
@@ -36,7 +36,13 @@ async def admin_list_conversations(
     limit: int = Query(50, ge=1, le=100, description="Max items to return"),
     search: str | None = Query(default=None, description="Search by title"),
     user_id: UUID | None = Query(default=None, description="Filter by user ID"),
-    include_archived: bool = Query(False, description="Include archived conversations"),
+    status: Literal["active", "archived", "all"] = Query(
+        "active", description="Filter by archival status"
+    ),
+    sort_by: Literal["title", "owner", "messages", "created_at", "updated_at"] = Query(
+        "updated_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all conversations across all users (admin only)."""
     return await service.admin_list_with_users(
@@ -44,7 +50,10 @@ async def admin_list_conversations(
         limit=limit,
         search=search,
         user_id=user_id,
-        include_archived=include_archived,
+        include_archived=status == "all",
+        archived_only=status == "archived",
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
 
@@ -53,11 +62,17 @@ async def admin_list_users(
     user_service: UserSvc,
     _: CurrentAdmin,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     search: str | None = Query(default=None, description="Search by email or name"),
+    sort_by: Literal["email", "full_name", "conversations", "created_at"] = Query(
+        "created_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all users with conversation counts (admin only)."""
-    return await user_service.admin_list_with_counts(skip=skip, limit=limit, search=search)
+    return await user_service.admin_list_with_counts(
+        skip=skip, limit=limit, search=search, sort_by=sort_by, sort_dir=sort_dir
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationReadWithMessages)
@@ -81,7 +96,13 @@ def admin_list_conversations(
     limit: int = Query(50, ge=1, le=100, description="Max items to return"),
     search: str | None = Query(default=None, description="Search by title"),
     user_id: str | None = Query(default=None, description="Filter by user ID"),
-    include_archived: bool = Query(False, description="Include archived conversations"),
+    status: Literal["active", "archived", "all"] = Query(
+        "active", description="Filter by archival status"
+    ),
+    sort_by: Literal["title", "owner", "messages", "created_at", "updated_at"] = Query(
+        "updated_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all conversations across all users (admin only)."""
     return service.admin_list_with_users(
@@ -89,7 +110,10 @@ def admin_list_conversations(
         limit=limit,
         search=search,
         user_id=user_id,
-        include_archived=include_archived,
+        include_archived=status == "all",
+        archived_only=status == "archived",
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
 
@@ -98,11 +122,17 @@ def admin_list_users(
     user_service: UserSvc,
     _: CurrentAdmin,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     search: str | None = Query(default=None, description="Search by email or name"),
+    sort_by: Literal["email", "full_name", "conversations", "created_at"] = Query(
+        "created_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all users with conversation counts (admin only)."""
-    return user_service.admin_list_with_counts(skip=skip, limit=limit, search=search)
+    return user_service.admin_list_with_counts(
+        skip=skip, limit=limit, search=search, sort_by=sort_by, sort_dir=sort_dir
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationReadWithMessages)
@@ -126,7 +156,13 @@ async def admin_list_conversations(
     limit: int = Query(50, ge=1, le=100, description="Max items to return"),
     search: str | None = Query(default=None, description="Search by title"),
     user_id: str | None = Query(default=None, description="Filter by user ID"),
-    include_archived: bool = Query(False, description="Include archived conversations"),
+    status: Literal["active", "archived", "all"] = Query(
+        "active", description="Filter by archival status"
+    ),
+    sort_by: Literal["title", "created_at", "updated_at"] = Query(
+        "updated_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all conversations across all users (admin only)."""
     return await service.admin_list_with_users(
@@ -134,7 +170,10 @@ async def admin_list_conversations(
         limit=limit,
         search=search,
         user_id=user_id,
-        include_archived=include_archived,
+        include_archived=status == "all",
+        archived_only=status == "archived",
+        sort_by=sort_by,
+        sort_dir=sort_dir,
     )
 
 
@@ -143,11 +182,17 @@ async def admin_list_users(
     user_service: UserSvc,
     _: CurrentAdmin,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     search: str | None = Query(default=None, description="Search by email or name"),
+    sort_by: Literal["email", "full_name", "created_at"] = Query(
+        "created_at", description="Sort column"
+    ),
+    sort_dir: Literal["asc", "desc"] = Query("desc", description="Sort direction"),
 ) -> Any:
     """List all users with conversation counts (admin only)."""
-    return await user_service.admin_list_with_counts(skip=skip, limit=limit, search=search)
+    return await user_service.admin_list_with_counts(
+        skip=skip, limit=limit, search=search, sort_by=sort_by, sort_dir=sort_dir
+    )
 
 
 @router.get("/{conversation_id}", response_model=ConversationReadWithMessages)

@@ -27,7 +27,10 @@ async def get_conversation_by_id(
     if include_messages:
         query = (
             select(Conversation)
-            .options(selectinload(Conversation.messages).selectinload(Message.tool_calls))
+            .options(
+                selectinload(Conversation.messages).selectinload(Message.tool_calls),
+                selectinload(Conversation.messages).selectinload(Message.files),
+            )
             .where(Conversation.id == conversation_id)
         )
         result = await db.execute(query)
@@ -145,6 +148,9 @@ async def admin_list_with_users(
     search: str | None = None,
     user_id: UUID | None = None,
     include_archived: bool = False,
+    archived_only: bool = False,
+    sort_by: str = "updated_at",
+    sort_dir: str = "desc",
 ) -> tuple[list[tuple[Conversation, int, str | None]], int]:
     """Admin: list conversations across all users with message counts and owner email.
 
@@ -152,12 +158,9 @@ async def admin_list_with_users(
     """
     from app.db.models.user import User
 
+    msg_count_col = func.count(Message.id).label("message_count")
     query = (
-        select(
-            Conversation,
-            func.count(Message.id).label("message_count"),
-            User.email.label("user_email"),
-        )
+        select(Conversation, msg_count_col, User.email.label("user_email"))
         .outerjoin(Message, Message.conversation_id == Conversation.id)
         .outerjoin(User, User.id == Conversation.user_id)
         .group_by(Conversation.id, User.email)
@@ -170,11 +173,24 @@ async def admin_list_with_users(
     if user_id is not None:
         query = query.where(Conversation.user_id == user_id)
         count_query = count_query.where(Conversation.user_id == user_id)
-    if not include_archived:
+    if archived_only:
+        query = query.where(Conversation.is_archived.is_(True))
+        count_query = count_query.where(Conversation.is_archived.is_(True))
+    elif not include_archived:
         query = query.where(Conversation.is_archived.is_(False))
         count_query = count_query.where(Conversation.is_archived.is_(False))
 
-    query = query.order_by(Conversation.updated_at.desc()).offset(skip).limit(limit)
+    sort_columns: dict[str, Any] = {
+        "title": Conversation.title,
+        "created_at": Conversation.created_at,
+        "updated_at": Conversation.updated_at,
+        "owner": User.email,
+        "messages": msg_count_col,
+    }
+    sort_col = sort_columns.get(sort_by, Conversation.updated_at)
+    sort_col = sort_col.desc() if sort_dir == "desc" else sort_col.asc()
+    query = query.order_by(sort_col).offset(skip).limit(limit)
+
     total = await db.scalar(count_query) or 0
     rows = (await db.execute(query)).all()
     return [(conv, msg_count, email) for conv, msg_count, email in rows], total

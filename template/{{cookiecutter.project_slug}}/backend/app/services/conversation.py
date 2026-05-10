@@ -301,6 +301,9 @@ class ConversationService:
         search: str | None = None,
         user_id: UUID | None = None,
         include_archived: bool = False,
+        archived_only: bool = False,
+        sort_by: str = "updated_at",
+        sort_dir: str = "desc",
     ) -> "AdminConversationList":
         """Admin: list conversations with owner email and message counts."""
         from app.schemas.conversation_share import AdminConversationList, AdminConversationRead
@@ -312,6 +315,9 @@ class ConversationService:
             search=search,
             user_id=user_id,
             include_archived=include_archived,
+            archived_only=archived_only,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         items = [
             AdminConversationRead(
@@ -936,6 +942,9 @@ class ConversationService:
         search: str | None = None,
         user_id: str | None = None,
         include_archived: bool = False,
+        archived_only: bool = False,
+        sort_by: str = "updated_at",
+        sort_dir: str = "desc",
     ) -> "AdminConversationList":
         """Admin: list conversations with owner email and message counts."""
         from app.schemas.conversation_share import AdminConversationList, AdminConversationRead
@@ -947,6 +956,9 @@ class ConversationService:
             search=search,
             user_id=user_id,
             include_archived=include_archived,
+            archived_only=archived_only,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         items = [
             AdminConversationRead(
@@ -1443,6 +1455,9 @@ class ConversationService:
         search: str | None = None,
         user_id: str | None = None,
         include_archived: bool = False,
+        archived_only: bool = False,
+        sort_by: str = "updated_at",
+        sort_dir: str = "desc",
     ) -> "AdminConversationList":
         """Admin: list conversations with owner email and message counts."""
         from app.schemas.conversation_share import AdminConversationList, AdminConversationRead
@@ -1453,6 +1468,9 @@ class ConversationService:
             search=search,
             user_id=user_id,
             include_archived=include_archived,
+            archived_only=archived_only,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
         )
         items = [
             AdminConversationRead(
