@@ -13,6 +13,15 @@ import type {
 } from "@/types";
 import { WS_URL } from "@/lib/constants";
 import { useConversationStore } from "@/stores";
+/** A message the user typed while the agent was busy / socket offline.
+ *  Held outside the chat history until the drainer ships it. */
+export interface QueuedMessage {
+  id: string;
+  content: string;
+  fileIds?: string[];
+  files?: ChatMessageFile[];
+}
+
 interface UseChatOptions {
   conversationId?: string | null;
   onConversationCreated?: (conversationId: string) => void;
@@ -36,9 +45,12 @@ export function useChat(options: UseChatOptions = {}) {
     currentMessageIdRef.current = id;
   }, []);
   const currentGroupIdRef = useRef<string | null>(null);
-  const messageQueueRef = useRef<
-    { content: string; fileIds?: string[]; files?: ChatMessageFile[] }[]
-  >([]);
+  // Outbound queue: messages typed while agent is busy / socket offline. Held
+  // here (not in the chat history) so the UI can surface them as cancellable
+  // "pending" entries above the input. The ref is the source of truth for the
+  // drainer effect; the parallel state triggers re-renders for the UI.
+  const messageQueueRef = useRef<QueuedMessage[]>([]);
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
   const modelRef = useRef<string | null>(null);
   const temperatureRef = useRef<number | null>(null);
   const thinkingEffortRef = useRef<"low" | "medium" | "high" | null>(null);
@@ -428,32 +440,16 @@ export function useChat(options: UseChatOptions = {}) {
   });
 
   const doSend = useCallback(
-    (
-      content: string,
-      fileIds?: string[],
-      files?: ChatMessageFile[],
-      opts?: { skipAdd?: boolean },
-    ) => {
-      // `skipAdd` is set by the queue drainer — the user message was already
-      // added to the chat at queue time, so we just flip `queued` off here.
-      if (opts?.skipAdd) {
-        useChatStore
-          .getState()
-          .updateMessagesWhere(
-            (m) => m.role === "user" && m.queued === true && m.content === content,
-            (m) => ({ ...m, queued: false }),
-          );
-      } else {
-        addMessage({
-          id: nanoid(),
-          role: "user",
-          content,
-          timestamp: new Date(),
-          conversationId: conversationId || undefined,
-          fileIds,
-          files,
-        });
-      }
+    (content: string, fileIds?: string[], files?: ChatMessageFile[]) => {
+      addMessage({
+        id: nanoid(),
+        role: "user",
+        content,
+        timestamp: new Date(),
+        conversationId: conversationId || undefined,
+        fileIds,
+        files,
+      });
       setIsProcessing(true);
       const payload: Record<string, unknown> = {
         message: content,
@@ -470,27 +466,29 @@ export function useChat(options: UseChatOptions = {}) {
 
   const sendChatMessage = useCallback(
     (content: string, fileIds?: string[], files?: ChatMessageFile[]) => {
-      // Queue when the agent is busy OR the socket is offline. Drained by the
-      // effect below as soon as the queue head is sendable. Without the
-      // offline gate, sendMessage() silently drops on a closed socket.
+      // Queue when the agent is busy OR the socket is offline. The queue is
+      // surfaced above the input as pending entries the user can cancel; the
+      // drainer effect below pops the head as soon as the agent is idle.
       if (isProcessing || !isConnected) {
-        messageQueueRef.current.push({ content, fileIds, files });
-        addMessage({
-          id: nanoid(),
-          role: "user",
-          content,
-          timestamp: new Date(),
-          conversationId: conversationId || undefined,
-          fileIds,
-          files,
-          queued: true,
-        });
+        const id = nanoid();
+        messageQueueRef.current.push({ id, content, fileIds, files });
+        setQueuedMessages([...messageQueueRef.current]);
         return;
       }
       doSend(content, fileIds, files);
     },
-    [isProcessing, isConnected, doSend, addMessage, conversationId],
+    [isProcessing, isConnected, doSend],
   );
+
+  const cancelQueued = useCallback((id: string) => {
+    messageQueueRef.current = messageQueueRef.current.filter((q) => q.id !== id);
+    setQueuedMessages([...messageQueueRef.current]);
+  }, []);
+
+  const clearQueued = useCallback(() => {
+    messageQueueRef.current = [];
+    setQueuedMessages([]);
+  }, []);
 
   // Human-in-the-Loop: send resume message with user decisions
   const sendResumeDecisions = useCallback(
@@ -541,11 +539,11 @@ export function useChat(options: UseChatOptions = {}) {
   useEffect(() => {
     if (isConnected && !isProcessing && messageQueueRef.current.length > 0) {
       const next = messageQueueRef.current.shift();
+      setQueuedMessages([...messageQueueRef.current]);
       if (next) {
-        setTimeout(
-          () => doSend(next.content, next.fileIds, next.files, { skipAdd: true }),
-          100,
-        );
+        // Small debounce so the UI shows the queue clearing visibly before
+        // the next user bubble lands; also avoids racing the WS state flip.
+        setTimeout(() => doSend(next.content, next.fileIds, next.files), 100);
       }
     }
   }, [isProcessing, isConnected, doSend]);
@@ -558,6 +556,9 @@ export function useChat(options: UseChatOptions = {}) {
     disconnect,
     sendMessage: sendChatMessage,
     clearMessages,
+    queuedMessages,
+    cancelQueued,
+    clearQueued,
     setModel: (model: string | null) => {
       modelRef.current = model;
     },

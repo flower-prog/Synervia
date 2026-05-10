@@ -7,6 +7,7 @@ import { ChatInput } from "./chat-input";
 import { ChatSettings } from "./chat-settings";
 import { FilePreviewPanel } from "./file-preview-panel";
 import { MessageList } from "./message-list";
+import { PendingMessages } from "./pending-messages";
 import { ToolApprovalDialog } from "./tool-approval-dialog";
 import { ChevronDown, Check, Database } from "lucide-react";
 import {
@@ -49,6 +50,9 @@ function AuthenticatedChatContainer() {
     disconnect,
     sendMessage,
     clearMessages,
+    queuedMessages,
+    cancelQueued,
+    clearQueued,
     setModel,
     setTemperature,
     setThinkingEffort,
@@ -84,10 +88,14 @@ function AuthenticatedChatContainer() {
 
     if (shouldClear) {
       clearMessages();
+      // Drop any pending queue when switching threads — those messages were
+      // typed in the previous conversation's context, sending them into a
+      // different conversation would surprise the user.
+      clearQueued();
     }
 
     prevConversationIdRef.current = currId;
-  }, [currentConversationId, clearMessages]);
+  }, [currentConversationId, clearMessages, clearQueued]);
 
   // Load messages from conversation store when switching to a saved conversation
   useEffect(() => {
@@ -201,6 +209,8 @@ function AuthenticatedChatContainer() {
       onRegenerate={handleRegenerate}
       slashContext={slashContext}
       slashCommands={slashCommands}
+      queuedMessages={queuedMessages}
+      onCancelQueued={cancelQueued}
       messagesEndRef={messagesEndRef}
       scrollContainerRef={scrollContainerRef}
       pendingApproval={pendingApproval}
@@ -278,6 +288,8 @@ interface ChatUIProps {
   onRegenerate?: (messageId: string) => void;
   slashContext?: import("./slash-commands").SlashCommandContext;
   slashCommands?: import("./slash-commands").SlashCommand[];
+  queuedMessages?: import("@/hooks/use-chat").QueuedMessage[];
+  onCancelQueued?: (id: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   pendingApproval?: PendingApproval | null;
@@ -297,6 +309,8 @@ function ChatUI({
   onRegenerate,
   slashContext,
   slashCommands,
+  queuedMessages,
+  onCancelQueued,
   messagesEndRef,
   scrollContainerRef,
   pendingApproval,
@@ -335,6 +349,9 @@ function ChatUI({
         )}
 
         <div className="px-2 pb-2 sm:px-4 sm:pb-4">
+          {queuedMessages && queuedMessages.length > 0 && onCancelQueued && (
+            <PendingMessages messages={queuedMessages} onCancel={onCancelQueued} />
+          )}
           <div className="bg-card border-foreground/10 focus-within:border-foreground/30 rounded-2xl border shadow-sm transition-colors">
             <div className="px-3 pt-3 sm:px-4 sm:pt-4">
               <ChatInput

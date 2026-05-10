@@ -165,8 +165,6 @@ export function MessageItem({ message, groupPosition, onRegenerate }: MessageIte
               isUser
                 ? "bg-primary text-primary-foreground rounded-tr-sm"
                 : "bg-muted rounded-tl-sm",
-              // Dim queued user messages so they read as "pending send"
-              message.queued && "opacity-60",
             )}
           >
             {isUser ? (
@@ -180,13 +178,6 @@ export function MessageItem({ message, groupPosition, onRegenerate }: MessageIte
               </div>
             )}
           </div>
-        )}
-
-        {isUser && message.queued && (
-          <span className="text-foreground/55 mt-1 inline-flex items-center gap-1.5 self-end font-mono text-[10px] tracking-wider uppercase">
-            <span className="bg-foreground/40 inline-block h-1 w-1 animate-pulse rounded-full" />
-            Queued
-          </span>
         )}
 
         {message.toolCalls && message.toolCalls.length > 0 && (
