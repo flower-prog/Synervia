@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  ArrowUpRight,
   BookOpen,
   CreditCard,
   Database,
@@ -15,7 +14,6 @@ import { cn } from "@/lib/utils";
 
 interface Action {
   label: string;
-  description: string;
   icon: LucideIcon;
   href: string;
   external?: boolean;
@@ -23,85 +21,42 @@ interface Action {
 }
 
 const ACTIONS: Action[] = [
-  {
-    label: "Start a chat",
-    description: "Talk to your AI assistant",
-    icon: MessageSquare,
-    href: ROUTES.CHAT,
-    featured: true,
-  },
-  {
-    label: "Upload to KB",
-    description: "Index a doc, sheet, or URL",
-    icon: Database,
-    href: ROUTES.RAG,
-  },
-  {
-    label: "Invite team",
-    description: "Bring teammates in",
-    icon: Users,
-    href: ROUTES.ORGS,
-  },
-  {
-    label: "Billing & credits",
-    description: "Subscription and usage",
-    icon: CreditCard,
-    href: ROUTES.BILLING,
-  },
-  {
-    label: "Settings",
-    description: "Profile, API keys, prefs",
-    icon: Settings,
-    href: ROUTES.SETTINGS,
-  },
-  {
-    label: "API docs",
-    description: "OpenAPI / Swagger",
-    icon: BookOpen,
-    href: `${BACKEND_URL}/docs`,
-    external: true,
-  },
+  { label: "Start a chat", icon: MessageSquare, href: ROUTES.CHAT, featured: true },
+  { label: "Upload to KB", icon: Database, href: ROUTES.RAG },
+  { label: "Invite team", icon: Users, href: ROUTES.ORGS },
+  { label: "Billing", icon: CreditCard, href: ROUTES.BILLING },
+  { label: "Settings", icon: Settings, href: ROUTES.SETTINGS },
+  { label: "API docs", icon: BookOpen, href: `${BACKEND_URL}/docs`, external: true },
 ];
 
 export function QuickActions() {
   return (
-    <div className="border-border bg-card flex h-full flex-col rounded-2xl border p-5 lg:p-6">
-      <h2 className="font-display text-foreground mb-4 text-base font-semibold">Quick actions</h2>
-      <div className="grid flex-1 grid-cols-2 gap-2.5">
+    <div className="border-border bg-card rounded-2xl border p-4 sm:p-5">
+      <h2 className="text-foreground/55 mb-2.5 font-mono text-[11px] tracking-wider uppercase">
+        Quick actions
+      </h2>
+      <div className="flex flex-wrap gap-1.5">
         {ACTIONS.map((action) => (
-          <ActionTile key={action.label} action={action} />
+          <ActionPill key={action.label} action={action} />
         ))}
       </div>
     </div>
   );
 }
 
-function ActionTile({ action }: { action: Action }) {
+function ActionPill({ action }: { action: Action }) {
   const inner = (
-    <div
+    <span
       className={cn(
-        "lift group relative flex h-full flex-col gap-3 rounded-xl border p-4 transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         action.featured
-          ? "border-brand/40 bg-brand/[0.08]"
-          : "border-foreground/10 hover:border-foreground/30",
+          ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
+          : "border-foreground/15 text-foreground hover:border-foreground/40 hover:bg-foreground/[0.04]",
       )}
     >
-      <div className="flex items-start justify-between">
-        <div
-          className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-full",
-            action.featured ? "bg-brand text-brand-foreground" : "bg-foreground/8 text-foreground",
-          )}
-        >
-          <action.icon className="h-4 w-4" />
-        </div>
-        <ArrowUpRight className="text-foreground/40 group-hover:text-foreground h-4 w-4 transition-colors" />
-      </div>
-      <div>
-        <p className="text-foreground text-sm font-semibold">{action.label}</p>
-        <p className="text-foreground/55 mt-0.5 text-xs">{action.description}</p>
-      </div>
-    </div>
+      <action.icon className="h-3.5 w-3.5 shrink-0" />
+      {action.label}
+    </span>
   );
 
   if (action.external) {
