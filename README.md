@@ -271,7 +271,7 @@ Use `make help` to see all available Makefile shortcuts.
 
 | Full Landing Page | Pricing |
 |:---:|:---:|
-| ![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/landingpage_full.png) | ![Pricing](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/pricing.png) |
+| ![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/landing_page.png) | ![Pricing](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/pricing.png) |
 
 | Blog | Blog Post |
 |:---:|:---:|
