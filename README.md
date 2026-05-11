@@ -245,27 +245,85 @@ Use `make help` to see all available Makefile shortcuts.
 
 ## 🎬 Demo
 
+**CLI generator:**
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/app_start.gif" alt="FastAPI Fullstack Generator Demo">
+</p>
+
+**Live chat (dark / light mode):**
+
+| Dark Mode | Light Mode |
+|:---:|:---:|
+| ![Chat Dark](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/chat_demo_dark.gif) | ![Chat Light](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/chat_demo_light.gif) |
+
+**File upload & RAG ingestion:**
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/file_uploud_light.gif" alt="File Upload Demo" width="80%">
 </p>
 
 ---
 
 ## 📸 Screenshots
 
-### Landing Page & Login
+### Marketing Site
 
-| Landing Page | Login |
+| Full Landing Page | Pricing |
 |:---:|:---:|
-| ![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/landingpage.png) | ![Login](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/login.png) |
+| ![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/landingpage_full.png) | ![Pricing](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/pricing.png) |
 
-### Dashboard, Chat & RAG
-
-| Dashboard | Chat with RAG |
+| Blog | Blog Post |
 |:---:|:---:|
-| ![Dashboard](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/dashboard.png) | ![Chat with RAG](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/chatwithrag.png) |
-| **Documents** | **Search** |
-| ![RAG Documents](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/ragdocuments.png) | ![RAG Search](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/ragsearch.png) |
+| ![Blog](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/blog.png) | ![Blog Post](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/blog_post.png) |
+
+### Auth
+
+| Login | Register |
+|:---:|:---:|
+| ![Login](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/login.png) | ![Register](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/register.png) |
+
+### Dashboard
+
+| Light Mode | Dark Mode |
+|:---:|:---:|
+| ![Dashboard Light](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/dashboard_light.png) | ![Dashboard Dark](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/dashboard_dark.png) |
+
+### Teams & Organizations
+
+| Workspaces | Team Members |
+|:---:|:---:|
+| ![Organizations](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/organizations.png) | ![Organization Details](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/organizations_details.png) |
+
+### Knowledge Bases & Billing
+
+| Knowledge Bases | Billing |
+|:---:|:---:|
+| ![Knowledge Bases](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/knowledge_bases.png) | ![Billing](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/billing.png) |
+
+### Profile & Settings
+
+| Profile | Account & Security | Slash Commands |
+|:---:|:---:|:---:|
+| ![Profile](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/profile.png) | ![Account](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/profile_account.png) | ![Slash Commands](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/profile_commands.png) |
+
+| Appearance & Brand Color | Notification Preferences |
+|:---:|:---:|
+| ![Appearance](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/profile_apperance.png) | ![Notifications](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/profile_notifications.png) |
+
+### Admin Panel
+
+| Overview | User Management |
+|:---:|:---:|
+| ![Admin Overview](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin.png) | ![Admin Users](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin_users.png) |
+
+| Conversation Browser | Message Quality & Ratings |
+|:---:|:---:|
+| ![Admin Conversations](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin_conversations.png) | ![Admin Ratings](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin_ratings.png) |
+
+| Stripe Events Log | System Health |
+|:---:|:---:|
+| ![Stripe Events](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin_stripe_events.png) | ![System Health](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/admin_system_health.png) |
 
 ### Observability
 
@@ -285,15 +343,11 @@ Use `make help` to see all available Makefile shortcuts.
 |:---:|
 | ![Telegram](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/telegram.png) |
 
-### Admin, Monitoring & API
+### Monitoring & API
 
-| Celery Flower | SQLAdmin Panel |
+| Celery Flower | API Documentation |
 |:---:|:---:|
-| ![Flower](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/flower.png) | ![Admin](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/admin.png) |
-
-| API Documentation |
-|:---:|
-| ![API Docs](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/docs_2.png) |
+| ![Flower](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/flower.png) | ![API Docs](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/docs_2.png) |
 
 ---
 
