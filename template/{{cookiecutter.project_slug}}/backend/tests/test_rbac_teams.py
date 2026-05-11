@@ -138,7 +138,7 @@ class TestCurrentAppAdmin:
 
 
 class TestOrgRolePermissionMatrix:
-    """Parametrised tests covering the full role × action permission matrix."""
+    """Parametrised tests covering the full role x action permission matrix."""
 
     _ROLES = ["owner", "admin", "member", "viewer"]
 

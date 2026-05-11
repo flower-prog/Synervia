@@ -76,7 +76,7 @@ class TestOrganizationRepository:
         mock_db.execute.return_value = mock_result
 
         with patch("app.repositories.organization.Organization", return_value=created_org):
-            result = await org_repo.create(
+            await org_repo.create(
                 mock_db,
                 name="Acme Corp",
                 slug="acme-corp",
@@ -208,7 +208,7 @@ class TestMemberRepository:
         mock_db.refresh.side_effect = lambda obj: None
 
         with patch("app.repositories.member.OrganizationMember", return_value=mock_member):
-            result = await member_repo.create(
+            await member_repo.create(
                 mock_db,
                 organization_id=uuid.uuid4(),
                 user_id=uuid.uuid4(),
