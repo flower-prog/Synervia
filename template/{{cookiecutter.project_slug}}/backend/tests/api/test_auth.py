@@ -4,11 +4,7 @@
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-{%- if cookiecutter.use_sqlite %}
-ServiceMock = MagicMock
-{%- else %}
 ServiceMock = AsyncMock
-{%- endif %}
 from uuid import uuid4
 
 import pytest
@@ -55,17 +51,10 @@ def mock_user() -> MockUser:
 def mock_user_service(mock_user: MockUser) -> MagicMock:
     """Create a mock user service."""
     service = MagicMock()
-{%- if cookiecutter.use_sqlite %}
-    service.authenticate = MagicMock(return_value=mock_user)
-    service.register = MagicMock(return_value=mock_user)
-    service.get_by_id = MagicMock(return_value=mock_user)
-    service.get_by_email = MagicMock(return_value=mock_user)
-{%- else %}
     service.authenticate = ServiceMock(return_value=mock_user)
     service.register = ServiceMock(return_value=mock_user)
     service.get_by_id = ServiceMock(return_value=mock_user)
     service.get_by_email = ServiceMock(return_value=mock_user)
-{%- endif %}
     return service
 
 

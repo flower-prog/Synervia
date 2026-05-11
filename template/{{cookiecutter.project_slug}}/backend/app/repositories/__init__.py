@@ -27,6 +27,9 @@ from app.repositories import sync_source as sync_source_repo
 {%- if (cookiecutter.use_postgresql or cookiecutter.use_sqlite) and cookiecutter.use_jwt %}
 
 from app.repositories import chat_file as chat_file_repo
+{%- endif %}
+{%- if cookiecutter.use_database and cookiecutter.use_jwt %}
+
 from app.repositories import conversation_share as conversation_share_repo
 from app.repositories import message_rating as message_rating_repo
 {%- endif %}
@@ -75,6 +78,8 @@ __all__ = [
 {%- endif %}
 {%- if (cookiecutter.use_postgresql or cookiecutter.use_sqlite) and cookiecutter.use_jwt %}
     "chat_file_repo",
+{%- endif %}
+{%- if cookiecutter.use_database and cookiecutter.use_jwt %}
     "conversation_share_repo",
     "message_rating_repo",
 {%- endif %}
