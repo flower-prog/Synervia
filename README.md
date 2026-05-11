@@ -251,16 +251,16 @@ Use `make help` to see all available Makefile shortcuts.
   <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/app_start.gif" alt="FastAPI Fullstack Generator Demo">
 </p>
 
-**Live chat (dark / light mode):**
+**Live chat:**
 
-| Dark Mode | Light Mode |
-|:---:|:---:|
-| ![Chat Dark](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/chat_demo_dark.gif) | ![Chat Light](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/chat_demo_light.gif) |
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/chat_demo_light.gif" alt="Chat Demo">
+</p>
 
 **File upload & RAG ingestion:**
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/file_uploud_light.gif" alt="File Upload Demo" width="80%">
+  <img src="https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/file_uploud_light.gif" alt="File Upload Demo">
 </p>
 
 ---
@@ -271,7 +271,7 @@ Use `make help` to see all available Makefile shortcuts.
 
 **Landing Page** — Full-page marketing site with hero, features breakdown, testimonials, pricing preview, and FAQ. Generated with the `enable_marketing_site` option.
 
-![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/landingpage_full.png)
+![Landing Page](https://raw.githubusercontent.com/vstorm-co/full-stack-ai-agent-template/main/assets/new/landing_page.png)
 
 **Pricing** — Three-tier pricing page (Starter / Pro / Business) with monthly/annual toggle. Pulls live plan data from Stripe when connected; shows template plans otherwise.
 
