@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`reranker.py` Cohere init imported the SDK only to discard it** — replaced the `from cohere import AsyncClient` probe with `importlib.util.find_spec("cohere")` so we check availability without polluting imports
 - **Auth components barrel exported password forms in OAuth-only builds** — `components/auth/index.ts` now gates the local-auth form exports behind `use_local_auth`, so OAuth-only projects don't ship dead code that references missing endpoints
 
+### Dependencies
+
+- Generator CI Python pinned to **3.14** (was 3.12) — `.github/workflows/{ci,docs,release}.yml` (#75)
+- `aquasecurity/trivy-action` → **v0.36.0** in generated projects' CI (#74)
+- `milvusdb/milvus` Docker tag → **v2.6.17** in generated `docker-compose.{dev,prod,}.yml` (#77)
+- `qdrant/qdrant` Docker tag → **v1.18.1** in generated `docker-compose.{dev,prod,}.yml` (#78)
+- `quay.io/coreos/etcd` Docker tag → **v3.6.11** (Milvus dependency) in generated `docker-compose.{dev,prod,}.yml` (#80)
+
 ## [0.2.9] - 2026-05-17
 
 ### Added
