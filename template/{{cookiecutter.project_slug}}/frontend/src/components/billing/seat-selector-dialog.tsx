@@ -42,7 +42,7 @@ export function SeatSelectorDialog({
 
   const activePlan = plans.find((p) => p.prices.some((pr) => pr.is_active));
   const price = activePlan?.prices.find((pr) => pr.is_active && pr.interval === "month");
-  const perSeatCentsCents = price?.amount_cents ?? null;
+  const perSeatCents = price?.amount_cents ?? null;
   const fmt = (cents: number) => formatCurrency(cents, price?.currency ?? "USD");
 
   const handleConfirm = async () => {
