@@ -2,9 +2,15 @@
 
 Guidance for AI coding agents (Codex, Copilot, Cursor, Zed, OpenCode) working with this repository.
 
+For current Synervia product routing, priorities, and commands, also read `CODEX.md`.
+Product work belongs in `product/synervia`; the root generator is retained separately.
+
 ## Project Overview
 
-**Full-Stack AI Agent Template** — CLI tool that generates production-ready FastAPI + Next.js projects with AI agents (5 frameworks), RAG (4 vector stores), and 20+ enterprise integrations.
+This repository contains the primary **Synervia** enterprise AI assistant under
+`product/synervia` and the retained **Full-Stack AI Agent Template** generator at the
+repository root. Product work belongs in `product/synervia`; generator work belongs in
+`fastapi_gen` and `template`.
 
 ## Commands
 
@@ -13,8 +19,11 @@ uv sync                    # Install dependencies
 uv run pytest              # Run tests
 uv run ruff check . --fix  # Lint
 uv run ruff format .       # Format
-uv run mypy fastapi_gen    # Type check
+uv run ty check            # Type check
 ```
+
+For product commands, run `make help` from `product/synervia`. Common checks are
+`make lint` and `make test`; `make bootstrap` starts the local product stack.
 
 ## CLI
 
@@ -32,7 +41,7 @@ uv run <project_slug> cmd rag-source-add           # Add a new source
 uv run <project_slug> cmd rag-source-sync          # Trigger sync for a source
 ```
 
-## Architecture
+## Generator Architecture
 
 | Module | Purpose |
 |--------|---------|

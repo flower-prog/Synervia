@@ -153,6 +153,7 @@ exclude = [
     "template/",
     "tests/",
     "ai_agent_test/",
+    "product/",
 ]
 
 [tool.pytest.ini_options]
