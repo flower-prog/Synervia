@@ -1,0 +1,94 @@
+name: Product CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "product/synervia/**"
+      - ".github/workflows/product-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "product/synervia/**"
+      - ".github/workflows/product-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: product-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: product/synervia
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DEBUG: "false"
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_db
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: product/synervia/backend/uv.lock
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Run backend checks
+        run: make backend-check
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: product/synervia
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: make frontend-install
+
+      - name: Run frontend checks
+        run: make frontend-check

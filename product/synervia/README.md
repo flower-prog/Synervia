@@ -198,6 +198,9 @@ For production, **never** commit secrets — `backend/.env` is gitignored. Fill 
 
 | Command | What it does |
 |---|---|
+| `make check` | Run all backend and frontend checks; CI uses the same entry points |
+| `make backend-check` | Run backend lint, formatting check, type check, and tests |
+| `make frontend-check` | Run frontend lint, type check, unit tests, and production build |
 | `make test` | Run pytest |
 | `make lint` | Run ruff check + format check + ty |
 | `make format` | Auto-format with ruff |

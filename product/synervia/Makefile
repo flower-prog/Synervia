@@ -1,4 +1,6 @@
-.PHONY: install format lint test run clean help db-init dev dev-down dev-logs dev-rebuild dev-frontend docker-clean stage stage-down prod prod-down
+.PHONY: install format lint test test-cov backend-check frontend-install frontend-lint frontend-test frontend-build frontend-check check run clean help db-init dev dev-down dev-logs dev-rebuild dev-frontend docker-clean stage stage-down prod prod-down
+
+JS_RUNNER ?= bun
 
 # === Environments ===========================================================
 # `make dev`   — local development (docker-compose.dev.yml + bind-mounted source)
@@ -146,10 +148,31 @@ lint:
 
 # === Testing ===
 test:
-	uv run --directory backend pytest tests/ -v
+	DEBUG=false uv run --directory backend pytest tests/ -v
 
 test-cov:
-	uv run --directory backend pytest tests/ -v --cov=app --cov-report=html --cov-report=term-missing
+	DEBUG=false uv run --directory backend pytest tests/ -v --cov=app --cov-report=html --cov-report=term-missing
+
+backend-check: lint test
+
+# === Frontend Quality ===
+frontend-install:
+	cd frontend && $(JS_RUNNER) install --frozen-lockfile
+
+frontend-lint:
+	cd frontend && $(JS_RUNNER) run lint
+	cd frontend && $(JS_RUNNER) run type-check
+
+frontend-test:
+	cd frontend && $(JS_RUNNER) run test:run
+
+frontend-build:
+	cd frontend && $(JS_RUNNER) run build
+
+frontend-check: frontend-lint frontend-test frontend-build
+
+# Local development and CI both use these same check targets.
+check: backend-check frontend-check
 
 
 # === Database ===
@@ -338,10 +361,13 @@ help:
 	@echo "  make install       Install Python deps + pre-commit hooks"
 	@echo ""
 	@echo "Development:"
-	@echo "  make run           Start dev server (with hot reload)"
-	@echo "  make test          Run tests"
-	@echo "  make lint          Check code quality"
-	@echo "  make format        Auto-format code"
+	@echo "  make check          Run all backend and frontend checks (same entry as CI)"
+	@echo "  make backend-check  Run backend lint, type checks, and tests"
+	@echo "  make frontend-check Run frontend lint, type checks, tests, and build"
+	@echo "  make run            Start dev server (with hot reload)"
+	@echo "  make test           Run backend tests"
+	@echo "  make lint           Check backend code quality"
+	@echo "  make format         Auto-format backend code"
 	@echo ""
 	@echo "Database:"
 	@echo "  make db-init       Initialize database (start + migrate)"

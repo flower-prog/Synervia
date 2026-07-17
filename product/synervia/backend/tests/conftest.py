@@ -6,6 +6,7 @@ See: https://anyio.readthedocs.io/en/stable/testing.html
 """
 # ruff: noqa: I001 - Imports structured for Jinja2 template conditionals
 
+import sys
 from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -20,12 +21,13 @@ from app.api.deps import get_db_session
 
 
 @pytest.fixture
-def anyio_backend() -> str:
+def anyio_backend() -> tuple[str, dict[str, bool]]:
     """Specify the async backend for anyio tests.
 
-    Options: "asyncio" or "trio". We use asyncio since that's what uvicorn uses.
+    Uvicorn uses uvloop on supported platforms. Matching it here also avoids
+    platform-specific behavior in the system asyncio event loop's thread pool.
     """
-    return "asyncio"
+    return "asyncio", {"use_uvloop": sys.platform != "win32"}
 
 
 @pytest.fixture
