@@ -33,11 +33,12 @@ When working below `product/synervia`, also follow `product/synervia/AGENTS.md`.
 
 The project is finishing Phase 0 and then proceeds through Phase 1 in this order:
 
-1. Establish a versioned product baseline, make it reproducibly runnable, and add product CI.
-2. Fix RAG ingestion status, retry semantics, chunk counts, and temporary-file cleanup.
-3. Enforce organization and knowledge-base isolation across API, Agent, Worker, and pgvector.
-4. Add reliable retrieval thresholds, reranking, no-evidence behavior, and traceable citations.
-5. Add end-to-end RAG tests and a minimal evaluation set.
+1. Make product backend/frontend checks pass and wire them into a root-level GitHub Actions workflow.
+2. Prove the full stack and login-to-knowledge-answer smoke flow are reproducibly runnable.
+3. Fix RAG ingestion status, retry semantics, chunk counts, and temporary-file cleanup.
+4. Enforce organization and knowledge-base isolation across API, Agent, Worker, and pgvector.
+5. Add reliable retrieval thresholds, reranking, no-evidence behavior, and traceable citations.
+6. Add end-to-end RAG tests and a minimal evaluation set.
 
 Do not expand multi-agent behavior, add many SaaS integrations, or allow unapproved write
 actions before Phase 1 isolation and correctness checks pass.
@@ -48,6 +49,9 @@ Run these from `product/synervia`:
 
 ```bash
 make install       # Install backend development dependencies
+make check         # Run all backend and frontend checks (same entry points as CI)
+make backend-check # Run backend lint, type checks, and tests
+make frontend-check # Run frontend lint, type checks, tests, and build
 make lint          # Backend lint, formatting check, and type check
 make test          # Backend tests
 make bootstrap     # Start the development stack, migrate, and seed an admin
