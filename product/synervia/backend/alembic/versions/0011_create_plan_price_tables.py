@@ -1,4 +1,3 @@
-
 """create plan and price tables — skipped (enable_billing=false or no SQL DB)
 
 Revision ID: 0011_create_plan_price_tables

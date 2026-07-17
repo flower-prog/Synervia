@@ -1,4 +1,3 @@
-
 """create organization tables
 
 Revision ID: 0001_org
@@ -8,9 +7,10 @@ Create Date: 2026-07-13T11:46:12.545102+00:00
 Tables: organizations, organization_members, invitations
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "0001_org"
 down_revision = "0000_users"
@@ -106,9 +106,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_org_member_org_id", "organization_members", ["organization_id"])
     op.create_index("ix_org_member_user_id", "organization_members", ["user_id"])
-    op.create_index(
-        "ix_org_member_org_role", "organization_members", ["organization_id", "role"]
-    )
+    op.create_index("ix_org_member_org_role", "organization_members", ["organization_id", "role"])
 
     op.create_table(
         "invitations",

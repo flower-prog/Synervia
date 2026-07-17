@@ -1,4 +1,3 @@
-
 """create knowledge_bases table + add knowledge_base_id to rag_documents
 
 Revision ID: 0007_knowledge_bases
@@ -11,8 +10,9 @@ will have knowledge_base_id = NULL until backfill migration 0008 runs.
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+from alembic import op
 
 revision = "0007_knowledge_bases"
 down_revision = "0006_backfill_conv_org"
@@ -29,9 +29,21 @@ def upgrade() -> None:
         sa.Column("scope", sa.String(16), nullable=False, server_default="personal"),
         sa.Column("collection_name", sa.String(255), nullable=False),
         sa.Column("is_default", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("owner_user_id", PG_UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("organization_id", PG_UUID(as_uuid=True), sa.ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "owner_user_id",
+            PG_UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "organization_id",
+            PG_UUID(as_uuid=True),
+            sa.ForeignKey("organizations.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_knowledge_bases_scope", "knowledge_bases", ["scope"])

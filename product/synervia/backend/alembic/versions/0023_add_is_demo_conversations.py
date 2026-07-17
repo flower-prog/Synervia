@@ -8,8 +8,9 @@ Adds ``is_demo`` boolean column to conversations so admins can flag curated
 agent runs for the public demo replay gallery (served without authentication).
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0023"
 down_revision = "0022"

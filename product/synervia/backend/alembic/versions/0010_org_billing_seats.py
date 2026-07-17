@@ -1,4 +1,3 @@
-
 """add billing seats to organizations — skipped (enable_billing/enable_teams=false or no SQL DB)
 
 Revision ID: 0010_org_billing_seats

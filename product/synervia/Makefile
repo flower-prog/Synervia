@@ -1,6 +1,7 @@
 .PHONY: install format lint test test-cov backend-check frontend-install frontend-lint frontend-test frontend-build frontend-check check run clean help db-init dev dev-down dev-logs dev-rebuild dev-frontend docker-clean stage stage-down prod prod-down
 
 JS_RUNNER ?= bun
+BACKEND_LINT_PATHS := app tests cli alembic
 
 # === Environments ===========================================================
 # `make dev`   — local development (docker-compose.dev.yml + bind-mounted source)
@@ -138,12 +139,12 @@ install:
 
 # === Code Quality ===
 format:
-	uv run --directory backend ruff format app tests cli
-	uv run --directory backend ruff check app tests cli --fix
+	uv run --directory backend ruff check $(BACKEND_LINT_PATHS) --fix
+	uv run --directory backend ruff format $(BACKEND_LINT_PATHS)
 
 lint:
-	uv run --directory backend ruff check app tests cli
-	uv run --directory backend ruff format app tests cli --check
+	uv run --directory backend ruff check $(BACKEND_LINT_PATHS)
+	uv run --directory backend ruff format $(BACKEND_LINT_PATHS) --check
 	uv run --directory backend ty check
 
 # === Testing ===

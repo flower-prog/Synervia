@@ -1,4 +1,3 @@
-
 """add is_app_admin to users
 
 Revision ID: 0003_is_app_admin
@@ -11,8 +10,9 @@ orgs, etc.). Default false — grant via the ``create-app-admin`` CLI command.
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy import inspect
+
+from alembic import op
 
 revision = "0003_is_app_admin"
 down_revision = "0002_backfill_orgs"

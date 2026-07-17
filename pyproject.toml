@@ -104,8 +104,10 @@ include = [
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-# Exclude Jinja2 template files and generated test projects
+# Product code has its own toolchain and CI entry points under product/synervia.
+# Keep root checks scoped to the generator and its tests.
 exclude = [
+    "product",
     "template",
     "test",
     "test_*",

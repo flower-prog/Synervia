@@ -1,4 +1,3 @@
-
 """add active_knowledge_base_ids to conversations
 
 Revision ID: 0009_conv_active_kb_ids
@@ -15,8 +14,9 @@ Semantics:
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
+
+from alembic import op
 
 revision = "0009_conv_active_kb_ids"
 down_revision = "0008_backfill_default_kbs"

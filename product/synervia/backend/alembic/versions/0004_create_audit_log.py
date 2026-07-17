@@ -1,4 +1,3 @@
-
 """create app_admin_audit_logs table
 
 Revision ID: 0004_audit_log
@@ -10,8 +9,10 @@ Used for security auditing and compliance.
 """
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
 from alembic import op
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
 revision = "0004_audit_log"
 down_revision = "0003_is_app_admin"
@@ -30,7 +31,9 @@ def upgrade() -> None:
         sa.Column("target_id", sa.String(36), nullable=True),
         sa.Column("details", JSONB, nullable=True),
         sa.Column("ip_address", sa.String(45), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_audit_actor_user_id", "app_admin_audit_logs", ["actor_user_id"])

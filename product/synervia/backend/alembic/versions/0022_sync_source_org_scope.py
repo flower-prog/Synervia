@@ -8,9 +8,10 @@ SyncSource is now org-scoped. collection_name is nullable so an integration
 can be created at org level before being assigned to a specific knowledge base.
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+from alembic import op
 
 revision = "0022"
 down_revision = "0018_user_slash_commands"

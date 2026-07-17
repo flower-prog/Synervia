@@ -1,4 +1,3 @@
-
 """backfill personal orgs for existing users
 
 Revision ID: 0002_backfill_orgs
@@ -13,6 +12,7 @@ import re
 import uuid
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0002_backfill_orgs"

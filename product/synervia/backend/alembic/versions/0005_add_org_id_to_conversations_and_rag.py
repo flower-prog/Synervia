@@ -1,4 +1,3 @@
-
 """add organization_id to conversations and rag_documents
 
 Revision ID: 0005_org_tenant_isolation
@@ -11,9 +10,10 @@ are left NULL and will be backfilled by migration 0006.
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy import inspect
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+from alembic import op
 
 revision = "0005_org_tenant_isolation"
 down_revision = "0004_5_core_tables"

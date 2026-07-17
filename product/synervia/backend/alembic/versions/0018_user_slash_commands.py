@@ -55,17 +55,11 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-        sa.UniqueConstraint(
-            "user_id", "name", name="uq_user_slash_commands_user_name"
-        ),
+        sa.UniqueConstraint("user_id", "name", name="uq_user_slash_commands_user_name"),
     )
-    op.create_index(
-        "ix_user_slash_commands_user_id", "user_slash_commands", ["user_id"]
-    )
+    op.create_index("ix_user_slash_commands_user_id", "user_slash_commands", ["user_id"])
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_user_slash_commands_user_id", table_name="user_slash_commands"
-    )
+    op.drop_index("ix_user_slash_commands_user_id", table_name="user_slash_commands")
     op.drop_table("user_slash_commands")
