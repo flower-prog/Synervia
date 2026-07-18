@@ -142,8 +142,10 @@ Text is split into chunks before embedding. Configure via environment variables:
 | `fixed` | Uniform chunk sizes; simplest but may split mid-sentence |
 
 ### Embedding Providers
-Embeddings are generated using **OpenAI** (`text-embedding-3-small` by default).
-Set `EMBEDDING_MODEL` to change the model.
+The default `EMBEDDING_PROVIDER=local` runs `BAAI/bge-small-zh-v1.5` on CPU through
+FastEmbed, so it needs no API key. The model is downloaded once and cached in
+`MODELS_CACHE_DIR`. Remote OpenAI-compatible and OpenRouter providers remain available with
+explicit embedding credentials. Set `EMBEDDING_DIMENSIONS` for unknown models.
 
 ### Vector Storage
 Vectors are stored in **pgvector** using the existing PostgreSQL database.

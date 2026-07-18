@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from openai import OpenAI
 
 from app.core.config import settings as app_settings
 from app.services.rag.config import RAGSettings
 from app.services.rag.models import Document
+
+if TYPE_CHECKING:
+    from fastembed import TextEmbedding
 
 
 def _chunk_texts(document: Document) -> list[str]:
@@ -56,14 +63,60 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         pass
 
 
+def _load_text_embedding(model: str, cache_dir: Path) -> TextEmbedding:
+    from fastembed import TextEmbedding
+
+    return TextEmbedding(model_name=model, cache_dir=str(cache_dir))
+
+
+class LocalEmbeddingProvider(BaseEmbeddingProvider):
+    """CPU embedding provider backed by FastEmbed's ONNX runtime."""
+
+    def __init__(self, model: str, cache_dir: Path) -> None:
+        self.model = model
+        self.cache_dir = cache_dir
+        self._embedding_model: TextEmbedding | None = None
+
+    @property
+    def embedding_model(self) -> TextEmbedding:
+        if self._embedding_model is None:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            self._embedding_model = _load_text_embedding(self.model, self.cache_dir)
+        return self._embedding_model
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return [vector.tolist() for vector in self.embedding_model.query_embed(texts)]
+
+    def embed_document(self, document: Document) -> list[list[float]]:
+        return [
+            vector.tolist() for vector in self.embedding_model.passage_embed(_chunk_texts(document))
+        ]
+
+    def warmup(self) -> None:
+        _ = self.embedding_model
+
+
 class EmbeddingService:
     def __init__(self, settings: RAGSettings):
         config = settings.embeddings_config
         self.expected_dim = config.dim
+        provider = app_settings.EMBEDDING_PROVIDER
+        if provider == "local":
+            self.provider = LocalEmbeddingProvider(
+                model=config.model,
+                cache_dir=app_settings.MODELS_CACHE_DIR,
+            )
+            return
+        if provider == "openrouter":
+            api_key = app_settings.EMBEDDING_API_KEY or app_settings.OPENROUTER_API_KEY
+            base_url = app_settings.EMBEDDING_BASE_URL or "https://openrouter.ai/api/v1"
+        else:
+            api_key = app_settings.EMBEDDING_API_KEY or app_settings.OPENAI_API_KEY
+            base_url = app_settings.EMBEDDING_BASE_URL or app_settings.OPENAI_BASE_URL
         self.provider = OpenAIEmbeddingProvider(
             model=config.model,
-            api_key=app_settings.OPENROUTER_API_KEY,
-            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            base_url=base_url,
         )
 
     def embed_query(self, query: str) -> list[float]:

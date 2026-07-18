@@ -44,6 +44,8 @@ dependencies = [
     "pydantic-ai-slim[openai,anthropic,google,openrouter,duckduckgo,web-fetch]>=1.80.0",
     # Vector store
     # pgvector uses existing asyncpg + sqlalchemy (no extra dep needed)
+    # Local CPU embeddings without a hosted API key or PyTorch runtime.
+    "fastembed>=0.8.0",
     # Text splitting
     "langchain-text-splitters>=0.4.0",
     # BM25 for hybrid search

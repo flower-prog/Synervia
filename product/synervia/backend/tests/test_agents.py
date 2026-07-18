@@ -5,9 +5,10 @@ from unittest.mock import patch
 import pytest
 from pydantic_ai.models.test import TestModel
 
-from app.agents.assistant import AssistantAgent, Deps, get_agent
+from app.agents.assistant import AssistantAgent, Deps, _build_model, get_agent
 from app.agents.prompts import get_system_prompt_with_rag
 from app.agents.utils import get_current_datetime
+from app.core.config import settings
 
 
 class TestDeps:
@@ -59,6 +60,37 @@ class TestAssistantAgent:
         assert agent.model_name == "gpt-4"
         assert agent.temperature == 0.5
         assert agent.system_prompt == "Custom prompt"
+
+    def test_openai_responses_model_uses_custom_base_url(self):
+        """OpenAI-compatible Responses gateways receive the configured URL and key."""
+        with (
+            patch.object(settings, "OPENAI_API_KEY", "relay-key"),
+            patch.object(settings, "OPENAI_BASE_URL", "https://relay.example/v1"),
+            patch.object(settings, "OPENAI_API_MODE", "responses"),
+            patch("app.agents.assistant.OpenAIProvider") as provider_cls,
+            patch("app.agents.assistant.OpenAIResponsesModel") as model_cls,
+        ):
+            model = _build_model("openai/relay-model")
+
+        provider_cls.assert_called_once_with(
+            api_key="relay-key", base_url="https://relay.example/v1"
+        )
+        model_cls.assert_called_once_with("relay-model", provider=provider_cls.return_value)
+        assert model is model_cls.return_value
+
+    def test_openai_chat_mode_uses_chat_completions_model(self):
+        """Chat-only OpenAI-compatible gateways use the Chat Completions adapter."""
+        with (
+            patch.object(settings, "OPENAI_API_KEY", "relay-key"),
+            patch.object(settings, "OPENAI_BASE_URL", "https://relay.example/v1"),
+            patch.object(settings, "OPENAI_API_MODE", "chat"),
+            patch("app.agents.assistant.OpenAIProvider") as provider_cls,
+            patch("app.agents.assistant.OpenAIChatModel") as model_cls,
+        ):
+            model = _build_model("relay-model")
+
+        model_cls.assert_called_once_with("relay-model", provider=provider_cls.return_value)
+        assert model is model_cls.return_value
 
     # ``_build_model`` is the single per-provider model factory in
     # assistant.py, so patching it keeps these tests provider-agnostic

@@ -38,17 +38,24 @@ group is for and which are required vs optional.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENAI_API_KEY` | **required** | — | From platform.openai.com |
-| `AI_MODEL` | optional | `gpt-5.5` | Default model used by agent (provider-specific) |
-| `ANTHROPIC_API_KEY` | **required** | — | From console.anthropic.com |
-| `GOOGLE_API_KEY` | **required** | — | From aistudio.google.com |
-| `OPENROUTER_API_KEY` | **required** | — | From openrouter.ai |
+| `OPENAI_API_KEY` | when using OpenAI-compatible models | — | OpenAI or gateway bearer token |
+| `OPENAI_BASE_URL` | optional | official OpenAI API | OpenAI-compatible gateway URL, including `/v1` |
+| `OPENAI_API_MODE` | optional | `responses` | `responses` or `chat`, depending on gateway support |
+| `AI_MODEL` | optional | `openai/gpt-5.5` | Default model; prefix selects the provider |
+| `ANTHROPIC_API_KEY` | when using Anthropic | — | From console.anthropic.com |
+| `GOOGLE_API_KEY` | when using Google | — | From aistudio.google.com |
+| `OPENROUTER_API_KEY` | when using OpenRouter | — | From openrouter.ai |
 | `LOGFIRE_TOKEN` | optional | — | When set, ships traces to Logfire (logfire.pydantic.dev) |
 
 ## RAG (pgvector)
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
+| `EMBEDDING_PROVIDER` | optional | `local` | `local`, `openai`, or `openrouter` |
+| `EMBEDDING_API_KEY` | for remote providers | selected provider key | Separate embedding credential when needed |
+| `EMBEDDING_BASE_URL` | optional | provider URL | Separate OpenAI-compatible embedding endpoint |
+| `EMBEDDING_MODEL` | optional | `BAAI/bge-small-zh-v1.5` | Local or remote embedding model identifier |
+| `EMBEDDING_DIMENSIONS` | for unknown models | inferred | Vector size used to create pgvector tables |
 | `RAG_S3_BUCKET` | required | — | Source bucket for ingestion |
 | `RAG_S3_PREFIX` | optional | `""` | Path prefix to scan |
 

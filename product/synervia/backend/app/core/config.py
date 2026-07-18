@@ -151,6 +151,8 @@ class Settings(BaseSettings):
     S3_BUCKET: str = "synervia"
     S3_REGION: str = "us-east-1"
     OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str | None = None
+    OPENAI_API_MODE: Literal["responses", "chat"] = "responses"
     ANTHROPIC_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
     OPENROUTER_API_KEY: str = ""
@@ -182,7 +184,11 @@ class Settings(BaseSettings):
 
     TAVILY_API_KEY: str = ""
     # Vector Database (pgvector) — uses existing PostgreSQL
-    EMBEDDING_MODEL: str = "text-embedding-3-large"
+    EMBEDDING_MODEL: str = "BAAI/bge-small-zh-v1.5"
+    EMBEDDING_DIMENSIONS: int | None = None
+    EMBEDDING_PROVIDER: Literal["local", "openai", "openrouter"] = "local"
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BASE_URL: str | None = None
 
     RAG_CHUNK_SIZE: int = 512
     RAG_CHUNK_OVERLAP: int = 50
@@ -222,6 +228,10 @@ class Settings(BaseSettings):
     def rag(self) -> "RAGSettings":
         """Build RAG-specific settings."""
         pdf_parser = PdfParser()
+        embedding_config = EmbeddingsConfig(
+            model=self.EMBEDDING_MODEL,
+            dim=self.EMBEDDING_DIMENSIONS or 0,
+        )
 
         return RAGSettings(
             collection_name=self.RAG_DEFAULT_COLLECTION,
@@ -230,7 +240,7 @@ class Settings(BaseSettings):
             chunking_strategy=self.RAG_CHUNKING_STRATEGY,
             enable_hybrid_search=self.RAG_HYBRID_SEARCH,
             enable_ocr=self.RAG_ENABLE_OCR,
-            embeddings_config=EmbeddingsConfig(model=self.EMBEDDING_MODEL),
+            embeddings_config=embedding_config,
             document_parser=DocumentParser(),
             pdf_parser=pdf_parser,
         )

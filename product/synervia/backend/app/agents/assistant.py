@@ -22,7 +22,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 def _build_model(
     model_name: str,
-) -> "OpenAIResponsesModel | AnthropicModel | GoogleModel | OpenRouterModel":
+) -> "OpenAIChatModel | OpenAIResponsesModel | AnthropicModel | GoogleModel | OpenRouterModel":
     """Dispatch to the right pydantic-ai Model for ``model_name``.
 
     Multi-provider deployments accept any model name from any installed SDK.
@@ -55,12 +55,20 @@ def _build_model(
     """
     name = model_name or settings.AI_MODEL
     lowered = name.lower()
+
+    def build_openai(model: str) -> OpenAIChatModel | OpenAIResponsesModel:
+        provider = OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL or None,
+        )
+        if settings.OPENAI_API_MODE == "chat":
+            return OpenAIChatModel(model, provider=provider)
+        return OpenAIResponsesModel(model, provider=provider)
+
     if "/" in lowered:
         prefix, _, rest = lowered.partition("/")
         if prefix == "openai":
-            return OpenAIResponsesModel(
-                rest, provider=OpenAIProvider(api_key=settings.OPENAI_API_KEY)
-            )
+            return build_openai(rest)
         if prefix == "anthropic":
             return AnthropicModel(rest)
         if prefix == "google":
@@ -74,7 +82,7 @@ def _build_model(
         return AnthropicModel(name.removeprefix("claude/"))
     if lowered.startswith("gemini"):
         return GoogleModel(name, provider=GoogleProvider(api_key=settings.GOOGLE_API_KEY))
-    return OpenAIResponsesModel(name, provider=OpenAIProvider(api_key=settings.OPENAI_API_KEY))
+    return build_openai(name)
 
 
 AskUserCallback = Callable[[list[dict[str, Any]]], Awaitable[list[dict[str, Any]]]]

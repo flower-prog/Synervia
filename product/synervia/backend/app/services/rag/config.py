@@ -88,19 +88,42 @@ EMBEDDING_DIMENSIONS: dict[str, int] = {
     "bge-small-en-v1.5": 384,
     "bge-base-en-v1.5": 768,
     "bge-large-en-v1.5": 1024,
+    "bge-small-zh-v1.5": 512,
+    "bge-base-zh-v1.5": 768,
+    "bge-large-zh-v1.5": 1024,
+    "nvidia/llama-nemotron-embed-vl-1b-v2": 2048,
+    "nvidia/llama-nemotron-embed-vl-1b-v2:free": 2048,
 }
+
+
+def get_embedding_dimension(model: str) -> int | None:
+    """Resolve dimensions for direct and provider-prefixed model names."""
+    if model in EMBEDDING_DIMENSIONS:
+        return EMBEDDING_DIMENSIONS[model]
+    model_without_variant = model.removesuffix(":free")
+    if model_without_variant in EMBEDDING_DIMENSIONS:
+        return EMBEDDING_DIMENSIONS[model_without_variant]
+    bare_model = model_without_variant.rsplit("/", maxsplit=1)[-1]
+    return EMBEDDING_DIMENSIONS.get(bare_model)
 
 
 class EmbeddingsConfig(BaseModel):
     """Embeddings configuration. Dimension is auto-derived from model name."""
 
-    model: str = "text-embedding-3-large"
-    dim: int = 3072
+    model: str = "BAAI/bge-small-zh-v1.5"
+    dim: int = 0
 
     @model_validator(mode="after")
     def set_dim_from_model(self) -> "EmbeddingsConfig":
-        if self.model in EMBEDDING_DIMENSIONS:
-            self.dim = EMBEDDING_DIMENSIONS[self.model]
+        if self.dim > 0:
+            return self
+        resolved_dim = get_embedding_dimension(self.model)
+        if resolved_dim is None:
+            raise ValueError(
+                f"Unknown embedding dimensions for {self.model!r}; "
+                "set EMBEDDING_DIMENSIONS explicitly"
+            )
+        self.dim = resolved_dim
         return self
 
 

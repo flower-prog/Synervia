@@ -95,6 +95,8 @@ Computed properties:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | (empty) | OpenAI API key |
+| `OPENAI_BASE_URL` | (official API) | OpenAI-compatible gateway URL, including `/v1` |
+| `OPENAI_API_MODE` | `responses` | API adapter: `responses` or `chat` |
 | `AI_MODEL` | `gpt-5.5` | Default LLM model for chat |
 | `ANTHROPIC_API_KEY` | (empty) | Anthropic API key |
 | `AI_MODEL` | `claude-opus-4-7` | Default LLM model for chat |
@@ -140,7 +142,15 @@ is needed.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `EMBEDDING_PROVIDER` | `local` | `local` (no key), `openai`, or `openrouter` |
+| `EMBEDDING_API_KEY` | (provider key) | Credential override for remote embeddings |
+| `EMBEDDING_BASE_URL` | (provider URL) | Optional OpenAI-compatible endpoint override |
+| `EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5` | Local or remote embedding model identifier |
+| `EMBEDDING_DIMENSIONS` | (inferred) | Required when the model's vector size is unknown |
+
+The default model runs locally on CPU through FastEmbed and needs no API key. Its files are
+downloaded on first startup and cached under `MODELS_CACHE_DIR`; Docker persists that directory
+in the `models_cache` volume. Changing models requires re-embedding existing collections.
 
 ### Chunking & Retrieval
 

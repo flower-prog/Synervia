@@ -21,6 +21,7 @@ services:
     container_name: synervia_backend
     volumes:
       - media_data:/app/media
+      - models_cache:/app/models_cache
     env_file:
       - ./backend/.env
     environment:
@@ -100,6 +101,7 @@ services:
     image: synervia_backend:dev
     volumes:
       - media_data:/app/media
+      - models_cache:/app/models_cache
     command: celery -A app.worker.celery_app worker --loglevel=warning --concurrency=4
     env_file:
       - ./backend/.env
@@ -210,5 +212,6 @@ networks:
 
 volumes:
   media_data:
+  models_cache:
   postgres_data:
   redis_data:
