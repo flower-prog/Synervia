@@ -1,7 +1,10 @@
-.PHONY: install format lint test test-cov backend-check frontend-install frontend-lint frontend-test frontend-build frontend-check check run clean help db-init dev dev-down dev-logs dev-rebuild dev-frontend docker-clean stage stage-down prod prod-down
+.PHONY: install format lint test test-cov backend-check frontend-install frontend-lint frontend-test frontend-build frontend-check check run clean help db-init embedding-model dev dev-down dev-logs dev-rebuild dev-frontend docker-clean stage stage-down prod prod-down
 
 JS_RUNNER ?= bun
 BACKEND_LINT_PATHS := app tests cli alembic
+
+embedding-model:
+	python3 backend/scripts/download_embedding_model.py
 
 # === Environments ===========================================================
 # `make dev`   — local development (docker-compose.dev.yml + bind-mounted source)
@@ -26,7 +29,7 @@ endef
 # Idempotent — re-run anytime. Migrations are no-ops when already at head;
 # admin seeding is a separate target (`make seed`) so re-running `make dev`
 # doesn't keep retrying user creation.
-dev:
+dev: embedding-model
 	@echo "▶ Building backend image…"
 	docker compose -f docker-compose.dev.yml build app
 	@echo "▶ Starting services…"
@@ -42,10 +45,10 @@ dev:
 	docker compose -f docker-compose.dev.yml exec -T app synervia db upgrade
 	@echo ""
 	@echo "🚀 Dev stack ready:"
-	@echo "   API:      http://localhost:8000"
-	@echo "   Docs:     http://localhost:8000/docs"
-	@echo "   Admin:    http://localhost:8000/admin"
-	@echo "   Frontend: http://localhost:3000  (run 'make dev-frontend' or 'cd frontend && bun dev')"
+	@echo "   API:      http://127.0.0.1:8020"
+	@echo "   Docs:     http://127.0.0.1:8020/docs"
+	@echo "   Admin:    http://127.0.0.1:8020/admin"
+	@echo "   Frontend: http://127.0.0.1:3010  (run 'make dev-frontend')"
 	@echo ""
 	@echo "First time? Run 'make seed' to create the default admin user."
 
@@ -62,7 +65,7 @@ seed:
 		docker compose -f docker-compose.dev.yml exec -T app \
 			synervia user create \
 				--email admin@example.com --password admin123 --superuser \
-		&& echo "  ✅ Admin created. Login at http://localhost:8000/admin"; \
+		&& echo "  ✅ Admin created. Login at http://127.0.0.1:8020/admin"; \
 	fi
 
 # Convenience: bootstrap a fresh checkout end-to-end.
@@ -82,16 +85,16 @@ docker-clean:
 dev-logs:
 	docker compose -f docker-compose.dev.yml $(COMPOSE_DEV_PROFILES) logs -f
 
-dev-rebuild:
+dev-rebuild: embedding-model
 	docker compose -f docker-compose.dev.yml build --no-cache app
-	docker compose -f docker-compose.dev.yml up -d --force-recreate app
+	docker compose -f docker-compose.dev.yml up -d --force-recreate app celery_worker celery_beat flower
 dev-frontend:
 	docker compose -f docker-compose.frontend.yml up -d
 	@echo ""
-	@echo "✅ Frontend at http://localhost:3000  (backend must be up — 'make dev')"
+	@echo "✅ Frontend at http://127.0.0.1:3010  (backend must be up — 'make dev')"
 
 # === Staging: built images, no bind mounts (production-like, local DB) ===
-stage:
+stage: embedding-model
 	docker compose -f docker-compose.yml up -d --build
 	$(call _wait_for_db,docker-compose.yml)
 	docker compose -f docker-compose.yml exec -T app synervia db upgrade
@@ -101,7 +104,7 @@ stage-down:
 	docker compose -f docker-compose.yml down
 
 # === Production: external Nginx, real secrets in backend/.env ===
-prod:
+prod: embedding-model
 	@test -f backend/.env || (echo "❌ backend/.env missing — run 'cp backend/.env.example backend/.env' and fill in real secrets" && exit 1)
 	docker compose --env-file backend/.env -f docker-compose.prod.yml up -d --build
 	@echo "▶ Waiting for DB then running migrations…"
@@ -223,7 +226,7 @@ user-list:
 	uv run --directory backend synervia user list
 
 # === Celery ===
-celery-worker:
+celery-worker: embedding-model
 	uv run --directory backend synervia celery worker
 
 celery-beat:
@@ -235,7 +238,7 @@ celery-flower:
 	@echo "✅ Flower started at http://localhost:5555"
 
 # === Docker: Backend (Development) ===
-docker-up:
+docker-up: embedding-model
 	docker compose build app
 	docker compose up -d
 	@echo ""

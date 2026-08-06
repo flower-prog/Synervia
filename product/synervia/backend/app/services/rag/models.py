@@ -83,6 +83,7 @@ class IngestionResult(BaseModel):
     message: str | None = None
     error_message: str | None = None
     document_id: str | None = None
+    chunk_count: int = 0
 
 
 class CollectionInfo(BaseModel):

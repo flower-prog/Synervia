@@ -5,6 +5,12 @@
 # This file is identical to docker-compose.yml for explicit naming preference.
 # Use docker-compose.yml for default development.
 
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  start_period: 15s
+  retries: 3
+
 services:
   app:
     build:
@@ -13,12 +19,11 @@ services:
     image: synervia_backend:dev
     container_name: synervia_backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8020:8000"
     volumes:
       - ./backend/app:/app/app:ro
       - ./backend/cli:/app/cli:ro
       - media_data:/app/media
-      - models_cache:/app/models_cache
     env_file:
       - ./backend/.env
     environment:
@@ -36,6 +41,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/api/v1/health", timeout=5)
     restart: unless-stopped
     labels:
       - "prometheus.scrape=true"
@@ -44,7 +56,7 @@ services:
 
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.8.2-pg16
     container_name: synervia_db
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -85,7 +97,6 @@ services:
     volumes:
       - ./backend/app:/app/app:ro
       - media_data:/app/media
-      - models_cache:/app/models_cache
     command: celery -A app.worker.celery_app worker --loglevel=debug
     env_file:
       - ./backend/.env
@@ -104,6 +115,11 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD-SHELL
+        - celery -A app.worker.celery_app inspect ping --destination celery@$$HOSTNAME --timeout=5
     restart: unless-stopped
 
   celery_beat:
@@ -112,7 +128,7 @@ services:
     container_name: synervia_celery_beat
     volumes:
       - ./backend/app:/app/app:ro
-    command: celery -A app.worker.celery_app beat --loglevel=debug
+    command: celery -A app.worker.celery_app beat --loglevel=debug --pidfile=/tmp/celerybeat.pid
     env_file:
       - ./backend/.env
     environment:
@@ -127,6 +143,11 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD-SHELL
+        - test -s /tmp/celerybeat.pid && kill -0 $$(cat /tmp/celerybeat.pid)
     restart: unless-stopped
 
   flower:
@@ -150,6 +171,13 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:5555/healthcheck", timeout=5)
     restart: unless-stopped
 
 networks:
@@ -158,6 +186,5 @@ networks:
 
 volumes:
   media_data:
-  models_cache:
   postgres_data:
   redis_data:

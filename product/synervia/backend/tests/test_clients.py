@@ -148,22 +148,20 @@ class TestRedisClient:
 
     @pytest.mark.anyio
     async def test_ping_not_connected(self, redis_client: RedisClient):
-        """Test ping when not connected returns False."""
+        """Test ping when not connected raises error."""
         redis_client.client = None
 
-        result = await redis_client.ping()
-
-        assert result is False
+        with pytest.raises(RuntimeError, match="not connected"):
+            await redis_client.ping()
 
     @pytest.mark.anyio
     async def test_ping_exception(self, redis_client: RedisClient, mock_aioredis: MagicMock):
-        """Test ping when exception occurs returns False."""
+        """Test ping propagates connection errors."""
         redis_client.client = mock_aioredis
-        mock_aioredis.ping = AsyncMock(side_effect=Exception("Connection error"))
+        mock_aioredis.ping = AsyncMock(side_effect=ConnectionError("Connection error"))
 
-        result = await redis_client.ping()
-
-        assert result is False
+        with pytest.raises(ConnectionError, match="Connection error"):
+            await redis_client.ping()
 
     def test_raw_property(self, redis_client: RedisClient, mock_aioredis: MagicMock):
         """Test accessing raw client."""

@@ -69,12 +69,8 @@ class RedisClient:
     async def ping(self) -> bool:
         """Ping Redis server. Returns True if connected."""
         if not self.client:
-            return False
-        try:
-            await self.client.ping()
-            return True
-        except Exception:
-            return False
+            raise RuntimeError("Redis client not connected")
+        return bool(await self.client.ping())
 
     @property
     def raw(self) -> aioredis.Redis:

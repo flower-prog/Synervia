@@ -50,7 +50,7 @@ async def test_readiness_check_redis_unhealthy(client: AsyncClient, mock_redis):
     data = response.json()
     assert data["status"] == "not_ready"
     assert data["checks"]["redis"]["status"] == "unhealthy"
-    assert "error" in data["checks"]["redis"]
+    assert data["checks"]["redis"]["error"] == "Redis ping failed"
 
 
 @pytest.mark.anyio

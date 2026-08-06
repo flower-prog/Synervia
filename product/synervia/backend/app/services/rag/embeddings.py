@@ -66,7 +66,11 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
 def _load_text_embedding(model: str, cache_dir: Path) -> TextEmbedding:
     from fastembed import TextEmbedding
 
-    return TextEmbedding(model_name=model, cache_dir=str(cache_dir))
+    return TextEmbedding(
+        model_name=model,
+        cache_dir=str(cache_dir),
+        local_files_only=True,
+    )
 
 
 class LocalEmbeddingProvider(BaseEmbeddingProvider):

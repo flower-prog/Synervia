@@ -126,6 +126,7 @@ class IngestionService:
             return IngestionResult(
                 status=IngestionStatus.DONE,
                 document_id=document.id,
+                chunk_count=len(document.chunked_pages or []),
                 message=f"Successfully {action} '{filepath.name}'",
             )
 

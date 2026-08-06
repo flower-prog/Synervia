@@ -20,10 +20,21 @@ from app.services.rag.connectors import CONNECTOR_REGISTRY
 from app.services.rag.documents import DocumentProcessor
 from app.services.rag.embeddings import EmbeddingService
 from app.services.rag.ingestion import IngestionService
+from app.services.rag.models import IngestionResult, IngestionStatus
 from app.services.sync_source import SyncSourceService
 from app.services.rag.vectorstore import PgVectorStore as VectorStore
 
 logger = logging.getLogger(__name__)
+
+
+def _require_successful_ingestion(result: IngestionResult) -> tuple[str, int]:
+    if result.status != IngestionStatus.DONE:
+        raise RuntimeError(
+            result.error_message or result.message or "Ingestion returned an error result"
+        )
+    if not result.document_id:
+        raise RuntimeError("Ingestion completed without a document ID")
+    return result.document_id, result.chunk_count
 
 
 def _build_ingestion_service() -> IngestionService:
@@ -111,13 +122,14 @@ async def _run_ingestion(
             replace=replace,
             source_path=source_path,
         )
+        document_id, chunk_count = _require_successful_ingestion(result)
         async with get_worker_db_context() as db:
             await RAGDocumentService(db).complete_ingestion(
-                rag_document_id, vector_document_id=result.document_id
+                rag_document_id, vector_document_id=document_id, chunk_count=chunk_count
             )
         await _notify_ws(rag_document_id, "done", source_path)
         logger.info("Ingestion complete: %s", source_path)
-        return {"status": "done", "document_id": result.document_id, "filename": source_path}
+        return {"status": "done", "document_id": document_id, "filename": source_path}
     except Exception as e:
         await _update_status(rag_document_id, "error", error_message=str(e))
         raise
@@ -202,7 +214,9 @@ async def _run_sync(
                         filetype=filepath.suffix.lstrip(".").lower(),
                     )
                     await RAGDocumentService(db).complete_ingestion(
-                        str(doc.id), vector_document_id=result.document_id
+                        str(doc.id),
+                        vector_document_id=result.document_id,
+                        chunk_count=result.chunk_count,
                     )
             else:
                 failed += 1

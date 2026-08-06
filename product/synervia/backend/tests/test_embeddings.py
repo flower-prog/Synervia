@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -14,6 +14,9 @@ from app.services.rag.embeddings import (
     LocalEmbeddingProvider,
     _load_text_embedding,
 )
+from app.services.rag.ingestion import IngestionService
+from app.services.rag.models import IngestionResult, IngestionStatus
+from app.worker.tasks.rag_tasks import _require_successful_ingestion
 
 
 class TestEmbeddingConfiguration:
@@ -163,5 +166,37 @@ def test_load_text_embedding_passes_model_and_cache_dir(tmp_path: Path):
     text_embedding.assert_called_once_with(
         model_name="BAAI/bge-small-zh-v1.5",
         cache_dir=str(tmp_path),
+        local_files_only=True,
     )
     assert result is text_embedding.return_value
+
+
+@pytest.mark.anyio
+async def test_ingestion_result_reports_actual_chunk_count(tmp_path: Path):
+    document = SimpleNamespace(
+        id="doc-1",
+        metadata=SimpleNamespace(source_path="", filename="doc.txt", content_hash="hash"),
+        chunked_pages=[SimpleNamespace(), SimpleNamespace()],
+    )
+    processor = SimpleNamespace(process_file=AsyncMock(return_value=document))
+    store = SimpleNamespace(insert_document=AsyncMock())
+
+    result = await IngestionService(processor=processor, vector_store=store).ingest_file(
+        filepath=tmp_path / "doc.txt",
+        collection_name="documents",
+        replace=False,
+    )
+
+    assert result.status == IngestionStatus.DONE
+    assert result.document_id == "doc-1"
+    assert result.chunk_count == 2
+
+
+def test_worker_rejects_failed_ingestion_result():
+    result = IngestionResult(
+        status=IngestionStatus.ERROR,
+        error_message="embedding failed",
+    )
+
+    with pytest.raises(RuntimeError, match="embedding failed"):
+        _require_successful_ingestion(result)

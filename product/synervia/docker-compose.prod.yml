@@ -12,6 +12,12 @@
 #   1. Configure your external Nginx using nginx/nginx.conf as reference
 #   2. Configure backend/.env with DOMAIN
 
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  start_period: 15s
+  retries: 3
+
 services:
 
   app:
@@ -21,7 +27,6 @@ services:
     container_name: synervia_backend
     volumes:
       - media_data:/app/media
-      - models_cache:/app/models_cache
     env_file:
       - ./backend/.env
     environment:
@@ -41,6 +46,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:8000/api/v1/health", timeout=5)
     restart: unless-stopped
     deploy:
       resources:
@@ -53,7 +65,7 @@ services:
 
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:0.8.2-pg16
     container_name: synervia_db
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
@@ -101,7 +113,6 @@ services:
     image: synervia_backend:dev
     volumes:
       - media_data:/app/media
-      - models_cache:/app/models_cache
     command: celery -A app.worker.celery_app worker --loglevel=warning --concurrency=4
     env_file:
       - ./backend/.env
@@ -119,6 +130,11 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD-SHELL
+        - celery -A app.worker.celery_app inspect ping --destination celery@$$HOSTNAME --timeout=5
     restart: unless-stopped
     deploy:
       replicas: 2
@@ -133,7 +149,7 @@ services:
   celery_beat:
     image: synervia_backend:dev
     container_name: synervia_celery_beat
-    command: celery -A app.worker.celery_app beat --loglevel=warning
+    command: celery -A app.worker.celery_app beat --loglevel=warning --pidfile=/tmp/celerybeat.pid
     env_file:
       - ./backend/.env
     environment:
@@ -148,6 +164,11 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD-SHELL
+        - test -s /tmp/celerybeat.pid && kill -0 $$(cat /tmp/celerybeat.pid)
     restart: unless-stopped
     deploy:
       resources:
@@ -176,6 +197,13 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://localhost:5555/healthcheck", timeout=5)
     restart: unless-stopped
     deploy:
       resources:
@@ -212,6 +240,5 @@ networks:
 
 volumes:
   media_data:
-  models_cache:
   postgres_data:
   redis_data:

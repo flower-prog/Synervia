@@ -101,3 +101,4 @@ logs/
 Thumbs.db
 
 # Project specific
+backend/models_cache/

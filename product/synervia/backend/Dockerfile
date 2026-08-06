@@ -10,6 +10,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+ENV UV_HTTP_TIMEOUT=300
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -17,8 +18,10 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-project --no-dev
 
-# Copy application
+# Copy the application together with the pre-downloaded local embedding model.
 COPY . /app
+RUN echo "1294ea4b6331115a353d81f96b85e8c8d7fdcc284453d5b2fab5b016230aad38  /app/models_cache/fast-bge-small-zh-v1.5/model_optimized.onnx" \
+    | sha256sum --check -
 
 # Install project
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -46,9 +49,5 @@ RUN adduser --disabled-password --gecos "" appuser && \
 USER appuser
 
 EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/health')" || exit 1
 
 CMD ["python", "-m", "cli.commands", "server", "run", "--host", "0.0.0.0", "--port", "8000"]

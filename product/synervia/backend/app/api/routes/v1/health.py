@@ -7,6 +7,7 @@ Provides Kubernetes-compatible health check endpoints:
 """
 # ruff: noqa: I001 - Imports structured for Jinja2 template conditionals
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,6 +18,8 @@ from app.api.deps import DBSession, Redis
 from app.core.config import settings
 from app.schemas.base import HealthDetailResponse, HealthResponse
 from app.services.health import build_health_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -107,10 +110,11 @@ async def readiness_probe(
                 "status": "unhealthy",
                 "error": "Ping failed",
             }
-    except Exception as e:
+    except Exception:
+        logger.exception("Redis readiness check failed")
         checks["redis"] = {
             "status": "unhealthy",
-            "error": str(e),
+            "error": "Redis ping failed",
         }
     checks["vector_store"] = {
         "status": "unknown",
